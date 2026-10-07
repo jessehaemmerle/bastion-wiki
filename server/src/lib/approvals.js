@@ -49,9 +49,10 @@ export async function submitChangeRequest(page, fields, user) {
   if (open) {
     row = await one(
       `UPDATE change_requests SET title=$2, content=$3, properties=$4, tags=$5, schema_id=$6, summary=$7, updated_at=now()
-        WHERE id=$1 RETURNING *`,
+        WHERE id=$1 AND status='pending' RETURNING *`,
       [open.id, ...values],
     );
+    if (!row) throw conflict('Der Änderungsvorschlag ist bereits erledigt');
   } else {
     row = await one(
       `INSERT INTO change_requests (page_id, base_version, title, content, properties, tags, schema_id, summary, author_id)
@@ -91,6 +92,10 @@ export async function decide(request, page, reviewer, approve, note = '') {
   if (!(await canReview(reviewer, page, request))) throw forbidden('Du darfst diesen Änderungsvorschlag nicht freigeben (Vier-Augen-Prinzip)');
   let updated = null;
   await tx(async (c) => {
+    // re-check under a lock: a parallel decision (or withdrawal) must not apply the request twice
+    const { rows: [locked] } = await c.query('SELECT * FROM change_requests WHERE id=$1 FOR UPDATE', [request.id]);
+    if (!locked || locked.status !== 'pending') throw conflict('Der Änderungsvorschlag ist bereits erledigt');
+    request = { ...request, ...locked };
     if (approve) {
       const { rows: [current] } = await c.query('SELECT * FROM pages WHERE id=$1 FOR UPDATE', [page.id]);
       const author = (await c.query('SELECT * FROM users WHERE id=$1', [request.author_id])).rows[0] || reviewer;
@@ -113,5 +118,6 @@ export async function decide(request, page, reviewer, approve, note = '') {
 export async function withdraw(request, user) {
   if (request.author_id !== user.id) throw forbidden();
   if (request.status !== 'pending') throw conflict('Der Änderungsvorschlag ist bereits erledigt');
-  await query(`UPDATE change_requests SET status='withdrawn', decided_at=now(), updated_at=now() WHERE id=$1`, [request.id]);
+  const { rowCount } = await query(`UPDATE change_requests SET status='withdrawn', decided_at=now(), updated_at=now() WHERE id=$1 AND status='pending'`, [request.id]);
+  if (!rowCount) throw conflict('Der Änderungsvorschlag ist bereits erledigt');
 }

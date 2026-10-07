@@ -16,6 +16,11 @@ async function canSee(user, entry, min = LEVEL.write) {
   const level = await spaceAccess(user, entry.space_id);
   if (level < min) return false;
   if (level >= LEVEL.admin) return true;
+  // restrictions inherited from the parent apply too; with the parent gone only space admins decide
+  if (entry.parent_id) {
+    const parent = await one('SELECT page_access(id, $2) AS access FROM pages WHERE id=$1', [entry.parent_id, user.id]);
+    if (parent ? parent.access < min : entry.data?.inheritedRestriction) return false;
+  }
   const perms = entry.data?.permissions || [];
   if (!perms.length) return true;
   const groups = (await many('SELECT group_id FROM group_members WHERE user_id=$1', [user.id])).map((g) => g.group_id);

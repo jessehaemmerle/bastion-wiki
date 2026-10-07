@@ -77,7 +77,7 @@ router.patch('/comments/:id', requireAuth, async (req, res) => {
     await query('UPDATE comments SET body=$2, mentions=$3, edited_at=now() WHERE id=$1', [c.id, b.body, mentioned.map((m) => m.id)]);
     await notifyUsers(fresh.map((m) => m.id), 'comment.mention', page, req.user, { commentId: c.id, excerpt: b.body.slice(0, 160) });
   }
-  if ('resolved' in req.body) {
+  if (req.body && typeof req.body === 'object' && 'resolved' in req.body) {
     if (c.parent_id) throw forbidden('Nur ganze Diskussionen können erledigt werden');
     if (c.author_id !== req.user.id && page.access < LEVEL.write) throw forbidden();
     await query(

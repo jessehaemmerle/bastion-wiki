@@ -51,7 +51,26 @@ export async function trashPage(c, page, userId) {
     comments: await q('SELECT * FROM comments WHERE page_id=$1 ORDER BY id'),
     permissions: await q('SELECT principal_type, principal_id, level FROM page_permissions WHERE page_id=$1'),
     children: (await q('SELECT id FROM pages WHERE parent_id=$1')).map((r) => r.id),
+    // restrictions inherited from above – the trash must not show the page to people who could not see it
+    inheritedRestriction: page.parent_id ? (await q(
+      `WITH RECURSIVE up AS (SELECT id, parent_id, 0 AS d FROM pages WHERE id=$1
+         UNION ALL SELECT p.id, p.parent_id, up.d+1 FROM pages p JOIN up ON p.id=up.parent_id WHERE up.d < 50)
+       SELECT EXISTS (SELECT 1 FROM up JOIN page_permissions pp ON pp.page_id=up.id) AS r`,
+      [page.parent_id],
+    ))[0].r : false,
   };
+  // children move up and would lose the restrictions they inherited from this page:
+  // unrestricted children get a copy (removed again on restore)
+  if (data.permissions.length && data.children.length) {
+    data.restrictedChildren = (await q(
+      `SELECT id FROM pages WHERE parent_id=$1 AND NOT EXISTS (SELECT 1 FROM page_permissions pp WHERE pp.page_id=pages.id)`,
+    )).map((r) => r.id);
+    await c.query(
+      `INSERT INTO page_permissions (page_id, principal_type, principal_id, level)
+       SELECT ch, pp.principal_type, pp.principal_id, pp.level FROM unnest($2::int[]) ch, page_permissions pp WHERE pp.page_id=$1`,
+      [page.id, data.restrictedChildren],
+    );
+  }
   await c.query(
     `INSERT INTO page_trash (page_id, space_id, parent_id, title, page_type, data, deleted_by) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [page.id, page.space_id, page.parent_id, page.title, page.page_type, JSON.stringify(data), userId],
@@ -68,6 +87,10 @@ export async function restoreFromTrash(entry, { spaceId } = {}) {
     throw new HttpError(400, 'Der ursprüngliche Bereich existiert nicht mehr – bitte einen Zielbereich wählen');
   }
   const page = await tx(async (c) => {
+    // claim the entry first: a second, concurrent restore of the same entry must not create a duplicate page
+    if (!(await c.query('DELETE FROM page_trash WHERE id=$1 RETURNING id', [entry.id])).rows.length) {
+      throw new HttpError(404, 'Eintrag nicht gefunden');
+    }
     const userIds = new Set((await c.query('SELECT id FROM users')).rows.map((u) => u.id));
     const ins = (table, cols, row) => insertRow(c, table, cols, row, userIds);
     const pageCols = await columns(c, 'pages');
@@ -118,13 +141,22 @@ export async function restoreFromTrash(entry, { spaceId } = {}) {
     }
     // former children that were moved up on deletion come back underneath
     if (d.children?.length) {
-      await c.query(
-        'UPDATE pages SET parent_id=$1 WHERE id = ANY($2) AND space_id=$3 AND parent_id IS NOT DISTINCT FROM $4',
+      const { rows: back } = await c.query(
+        'UPDATE pages SET parent_id=$1 WHERE id = ANY($2) AND space_id=$3 AND parent_id IS NOT DISTINCT FROM $4 RETURNING id',
         [p.id, d.children, targetSpace, entry.parent_id],
       );
+      // back underneath: they inherit again, so drop the copies made on deletion
+      const copied = back.map((r) => r.id).filter((id) => (d.restrictedChildren || []).includes(id));
+      if (copied.length) {
+        await c.query(
+          `DELETE FROM page_permissions pp USING page_permissions own
+            WHERE pp.page_id = ANY($1) AND own.page_id=$2
+              AND own.principal_type=pp.principal_type AND own.principal_id=pp.principal_id AND own.level=pp.level`,
+          [copied, p.id],
+        );
+      }
     }
     await syncLinks(c, p.id, p.content);
-    await c.query('DELETE FROM page_trash WHERE id=$1', [entry.id]);
     return p;
   });
   return page;

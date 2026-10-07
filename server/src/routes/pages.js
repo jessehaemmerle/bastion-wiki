@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { many, one, query, tx } from '../db/index.js';
 import { requireAuth } from '../lib/auth.js';
-import { badRequest, conflict, intParam, notFound, pick, slugify } from '../lib/http.js';
+import { badRequest, conflict, forbidden, intParam, notFound, pick, slugify } from '../lib/http.js';
 import { LEVEL, LEVEL_NAME, loadPage, loadSpace } from '../lib/permissions.js';
 import { sanitize, htmlToText } from '../lib/sanitize.js';
 import { audit } from '../lib/audit.js';
@@ -74,15 +74,17 @@ export async function uniqueSlug(c, spaceId, title, excludeId = 0) {
   }
 }
 
-async function assertParent(c, parentId, spaceId, selfId = null) {
+async function assertParent(c, parentId, spaceId, selfId = null, userId = null) {
   if (parentId == null) return;
-  const { rows } = await c.query('SELECT id, space_id FROM pages WHERE id=$1', [parentId]);
-  if (!rows[0] || rows[0].space_id !== spaceId) throw badRequest('Übergeordnete Seite gehört nicht zu diesem Bereich');
+  const { rows } = await c.query('SELECT id, space_id, page_access(id, $2) AS access FROM pages WHERE id=$1', [parentId, userId]);
+  // restricted parents: hidden ones look like missing ones, read-only ones may not get new subpages
+  if (!rows[0] || rows[0].space_id !== spaceId || (userId && rows[0].access < LEVEL.read)) throw badRequest('Übergeordnete Seite gehört nicht zu diesem Bereich');
+  if (userId && rows[0].access < LEVEL.write) throw forbidden();
   if (selfId) {
-    // prevent cycles: walk up from the new parent
+    // prevent cycles: walk up from the new parent (UNION stops on a pre-existing loop)
     const { rows: chain } = await c.query(
       `WITH RECURSIVE up AS (SELECT id, parent_id FROM pages WHERE id=$1
-         UNION ALL SELECT p.id, p.parent_id FROM pages p JOIN up ON p.id = up.parent_id)
+         UNION SELECT p.id, p.parent_id FROM pages p JOIN up ON p.id = up.parent_id)
        SELECT id FROM up`,
       [parentId],
     );
@@ -122,13 +124,13 @@ router.get('/pages', async (req, res) => {
   if (req.query.space) add('s.key = ?', String(req.query.space));
   if (req.query.tag) add('EXISTS (SELECT 1 FROM page_tags pt JOIN tags t ON t.id=pt.tag_id WHERE pt.page_id=p.id AND t.name = ?)', String(req.query.tag));
   if (req.query.type) add('p.page_type = ?', String(req.query.type));
-  if (req.query.author) add('p.updated_by = ?', Number(req.query.author));
+  if (req.query.author) add('p.updated_by = ?', intParam(req.query.author, 'Autor-ID'));
   if (req.query.review === 'overdue') where.push('p.review_due < current_date');
   if (req.query.review === 'soon') where.push(`p.review_due BETWEEN current_date AND current_date + 30`);
   if (req.query.pinned === 'true') where.push('p.is_pinned');
   const sort = { updated: 'p.updated_at DESC', title: 'p.title ASC', created: 'p.created_at DESC', review: 'p.review_due ASC NULLS LAST' }[req.query.sort] || 'p.updated_at DESC';
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
-  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const limit = Math.min(Math.max(Math.floor(Number(req.query.limit)) || 50, 1), 200);
+  const offset = Math.min(Math.max(Math.floor(Number(req.query.offset)) || 0, 0), 1_000_000);
   const rows = await many(`${LIST_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${sort} LIMIT ${limit} OFFSET ${offset}`, params);
   res.json({ pages: rows.map(mapListPage) });
 });
@@ -248,7 +250,7 @@ router.post('/pages', async (req, res) => {
   const properties = cleanProperties(b.properties);
   assertProperties(await loadSchema(b.schemaId), properties);
   const page = await tx(async (c) => {
-    await assertParent(c, b.parentId ?? null, space.id);
+    await assertParent(c, b.parentId ?? null, space.id, null, req.user.id);
     const slug = await uniqueSlug(c, space.id, b.title);
     const { rows: [{ next }] } = await c.query(
       'SELECT coalesce(max(sort_order),0)+1 AS next FROM pages WHERE space_id=$1 AND parent_id IS NOT DISTINCT FROM $2',
@@ -288,7 +290,7 @@ export async function writePage(c, current, fields, author, summary = '') {
   const schemaId = fields.schemaId !== undefined ? fields.schemaId : current.schema_id;
   const contentChanged = content !== current.content || title !== current.title
     || JSON.stringify(properties) !== JSON.stringify(current.properties) || schemaId !== current.schema_id;
-  if (fields.parentId !== undefined) await assertParent(c, fields.parentId, current.space_id, current.id);
+  if (fields.parentId !== undefined) await assertParent(c, fields.parentId, current.space_id, current.id, author.id);
   const slug = title !== current.title ? await uniqueSlug(c, current.space_id, title, current.id) : current.slug;
   const version = contentChanged ? current.version + 1 : current.version;
   const { rows } = await c.query(
@@ -323,10 +325,20 @@ const CONTENT_KEYS = ['title', 'content', 'properties', 'tags', 'schemaId'];
 router.put('/pages/:id', async (req, res) => {
   const current = await loadPage(req.user, intParam(req.params.id), LEVEL.write);
   const b = pick(req.body, { ...pageSchema, bypassApproval: { type: 'bool' } }, { partial: true });
-  if (b.baseVersion && b.baseVersion !== current.version) {
-    const who = await one('SELECT display_name FROM users WHERE id=$1', [current.updated_by]);
-    throw conflict(`Die Seite wurde zwischenzeitlich von ${who?.display_name || 'jemand anderem'} bearbeitet (Version ${current.version}). Bitte neu laden.`);
-  }
+  // re-read the row under a lock inside the write transaction, so concurrent saves neither
+  // overwrite each other with stale values nor slip past the version check
+  const checkVersion = async (row) => {
+    if (b.baseVersion && b.baseVersion !== row.version) {
+      const { rows: [who] } = await query('SELECT display_name FROM users WHERE id=$1', [row.updated_by]);
+      throw conflict(`Die Seite wurde zwischenzeitlich von ${who?.display_name || 'jemand anderem'} bearbeitet (Version ${row.version}). Bitte neu laden.`);
+    }
+  };
+  const locked = async (c) => {
+    const { rows: [row] } = await c.query('SELECT * FROM pages WHERE id=$1 FOR UPDATE', [current.id]);
+    if (!row) throw notFound('Seite nicht gefunden');
+    return row;
+  };
+  await checkVersion(current);
   const fields = { ...b };
   if (b.content !== undefined) fields.content = sanitize(b.content);
   if (b.properties !== undefined) fields.properties = cleanProperties(b.properties);
@@ -341,12 +353,16 @@ router.put('/pages/:id', async (req, res) => {
   if (current.approval_required && touchesContent && !(b.bypassApproval && req.user.role === 'admin')) {
     const request = await submitChangeRequest(current, fields, req.user);
     const meta = Object.fromEntries(Object.entries(fields).filter(([k]) => !CONTENT_KEYS.includes(k) && k in pageSchema && k !== 'summary' && k !== 'baseVersion'));
-    if (Object.keys(meta).length) await tx((c) => writePage(c, current, meta, req.user));
+    if (Object.keys(meta).length) await tx(async (c) => writePage(c, await locked(c), meta, req.user));
     await audit(req, 'page.change_request', 'page', current.id, { request: request.id });
     return res.status(202).json({ pending: true, changeRequest: { id: request.id }, page: { id: current.id, version: current.version } });
   }
 
-  const { page, contentChanged } = await tx((c) => writePage(c, current, fields, req.user, b.summary));
+  const { page, contentChanged } = await tx(async (c) => {
+    const row = await locked(c);
+    await checkVersion(row);
+    return writePage(c, row, fields, req.user, b.summary);
+  });
   await audit(req, 'page.update', 'page', page.id, { title: page.title, version: page.version, bypassApproval: Boolean(current.approval_required && touchesContent) });
   if (contentChanged) notifyPageEvent('page.update', page, req.user, { version: page.version, summary: b.summary || '' });
   res.json({ page: { id: page.id, slug: page.slug, version: page.version, updatedAt: page.updated_at } });
@@ -373,16 +389,18 @@ router.post('/pages/:id/move', async (req, res) => {
   if (targetSpaceId !== page.space_id) await loadSpace(req.user, targetSpaceId, LEVEL.write);
   const parentId = b.parentId ?? null;
   await tx(async (c) => {
-    await assertParent(c, parentId, targetSpaceId, page.id);
+    await assertParent(c, parentId, targetSpaceId, page.id, req.user.id);
     if (targetSpaceId !== page.space_id) {
-      // move whole subtree to the new space
-      const slug = await uniqueSlug(c, targetSpaceId, page.title, page.id);
-      await c.query(
-        `WITH RECURSIVE sub AS (SELECT id FROM pages WHERE id=$1 UNION ALL SELECT p.id FROM pages p JOIN sub ON p.parent_id=sub.id)
-         UPDATE pages SET space_id=$2 WHERE id IN (SELECT id FROM sub) AND id<>$1`,
-        [page.id, targetSpaceId],
+      // move whole subtree to the new space; every slug must be unique there, not only the moved page's
+      const { rows: subtree } = await c.query(
+        `WITH RECURSIVE sub AS (SELECT id, slug FROM pages WHERE id=$1 UNION SELECT p.id, p.slug FROM pages p JOIN sub ON p.parent_id=sub.id)
+         SELECT id, slug FROM sub`,
+        [page.id],
       );
-      await c.query('UPDATE pages SET space_id=$2, slug=$3 WHERE id=$1', [page.id, targetSpaceId, slug]);
+      for (const d of subtree) {
+        const slug = await uniqueSlug(c, targetSpaceId, d.id === page.id ? page.title : d.slug, d.id);
+        await c.query('UPDATE pages SET space_id=$2, slug=$3 WHERE id=$1', [d.id, targetSpaceId, slug]);
+      }
       await c.query(
         `WITH RECURSIVE sub AS (SELECT id FROM pages WHERE id=$1 UNION ALL SELECT p.id FROM pages p JOIN sub ON p.parent_id=sub.id)
          UPDATE page_secrets SET space_id=$2 WHERE page_id IN (SELECT id FROM sub)`,
@@ -420,6 +438,12 @@ router.post('/pages/:id/duplicate', async (req, res) => {
       [rows[0].id, title, page.content, page.properties, `Kopie von #${page.id}`, req.user.id],
     );
     await setTags(c, rows[0].id, tags.map((t) => t.name));
+    // the copy keeps the page's own restrictions – otherwise duplicating would publish a restricted page to the whole space
+    await c.query(
+      `INSERT INTO page_permissions (page_id, principal_type, principal_id, level)
+       SELECT $2, principal_type, principal_id, level FROM page_permissions WHERE page_id=$1`,
+      [page.id, rows[0].id],
+    );
     const content = await cloneSecrets(c, page.content, rows[0].id, req.user.id);
     if (content !== page.content) {
       await c.query('UPDATE pages SET content=$2 WHERE id=$1', [rows[0].id, content]);
@@ -481,8 +505,10 @@ router.post('/pages/:id/revisions/:version/restore', async (req, res) => {
     const request = await submitChangeRequest(page, { title: r.title, content: r.content, properties: r.properties, summary: `Wiederherstellung von Version ${version}` }, req.user);
     return res.status(202).json({ pending: true, changeRequest: { id: request.id } });
   }
-  const next = page.version + 1;
-  await tx(async (c) => {
+  const next = await tx(async (c) => {
+    // version from the locked row – a concurrent save may have bumped it since loadPage
+    const { rows: [{ version: latest }] } = await c.query('SELECT version FROM pages WHERE id=$1 FOR UPDATE', [page.id]);
+    const next = latest + 1;
     await c.query(
       `UPDATE pages SET title=$2, content=$3, content_text=$4, properties=$5, version=$6, updated_by=$7, updated_at=now() WHERE id=$1`,
       [page.id, r.title, r.content, htmlToText(r.content), r.properties, next, req.user.id],
@@ -493,6 +519,7 @@ router.post('/pages/:id/revisions/:version/restore', async (req, res) => {
     );
     await syncLinks(c, page.id, r.content);
     await linkSecrets(c, page.id, page.space_id, r.content);
+    return next;
   });
   await audit(req, 'page.restore', 'page', page.id, { from: version, to: next });
   res.json({ version: next });

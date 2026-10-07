@@ -5,7 +5,11 @@ import { many } from '../db/index.js';
  * (<div data-type="snippet" data-snippet-id="7">); the content is inserted when the page is shown or exported.
  */
 const REF = /<div[^>]*data-type="snippet"[^>]*><\/div>/g;
-const idOf = (tag) => Number((tag.match(/data-snippet-id="(\d+)"/) || [])[1]) || null;
+// ids beyond the int4 range cannot exist and would make the ANY($1) lookup fail
+const idOf = (tag) => {
+  const n = Number((tag.match(/data-snippet-id="(\d+)"/) || [])[1]);
+  return n > 0 && n <= 2147483647 ? n : null;
+};
 
 export function snippetIds(html) {
   return [...new Set((String(html || '').match(REF) || []).map(idOf).filter(Boolean))];

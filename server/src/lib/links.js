@@ -18,6 +18,8 @@ export function extractLinks(html) {
     else if ((m = h.match(/^\/api\/attachments\/(\d+)/))) link = { kind: 'attachment', targetId: Number(m[1]) };
     else if (/^https?:\/\//i.test(h)) link = { kind: 'external', targetId: null };
     if (!link) return;
+    // ids beyond the int4 range cannot exist and would make the whole insert (and the page save) fail; keep them as broken links
+    if (link.targetId > 2147483647) link.targetId = null;
     const key = `${link.kind}|${link.targetId ?? h}`;
     if (seen.has(key)) return;
     seen.add(key);

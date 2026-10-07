@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { many } from '../db/index.js';
+import { many, one } from '../db/index.js';
 import { requireAuth } from '../lib/auth.js';
 
 const router = Router();
@@ -44,13 +44,14 @@ const MARK_END = '\u0003';
 
 router.get('/search', async (req, res) => {
   const raw = String(req.query.q || '').slice(0, 300);
-  const limit = Math.min(Number(req.query.limit) || 20, 100);
+  const limit = Math.min(Math.max(Math.floor(Number(req.query.limit)) || 20, 1), 100);
   const { filters, text } = parseQuery(raw);
   if (req.query.space) filters.space = String(req.query.space);
   if (req.query.type) filters.type = String(req.query.type);
   if (req.query.tag) filters.tags.push(String(req.query.tag));
 
-  const tsq = toTsQuery(text);
+  // unaccent before quoting: it can turn letters into quotes (e.g. U+02BC → ') and break the tsquery syntax
+  const tsq = text ? toTsQuery((await one('SELECT immutable_unaccent($1) AS t', [text]))?.t || '') : null;
   const params = [req.user.id];
   const p = (v) => { params.push(v); return `$${params.length}`; };
   const where = ['page_access(p.id, $1) >= 1'];
@@ -61,7 +62,7 @@ router.get('/search', async (req, res) => {
     const like = p(`%${text.replace(/[%_\\]/g, '\\$&')}%`);
     if (tsq) {
       const q = p(tsq);
-      const tsExpr = `to_tsquery('simple', immutable_unaccent(${q}))`;
+      const tsExpr = `to_tsquery('simple', ${q})`;
       where.push(`(p.search_vector @@ ${tsExpr} OR p.title ILIKE ${like} OR p.content_text ILIKE ${like} OR p.properties::text ILIKE ${like})`);
       rank = `ts_rank_cd(p.search_vector, ${tsExpr}) + similarity(p.title, ${p(text)}) * 2 + CASE WHEN p.title ILIKE ${like} THEN 1 ELSE 0 END`;
       headline = `ts_headline('simple', p.content_text, ${tsExpr},

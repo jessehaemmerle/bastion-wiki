@@ -46,16 +46,21 @@ router.put('/admin/schemas/:id', requireRole('admin'), async (req, res) => {
   if (await one('SELECT 1 FROM sheet_schemas WHERE lower(name)=lower($1) AND id<>$2', [b.name, id])) throw conflict('Ein Schema mit diesem Namen existiert bereits');
   const fields = cleanFields(b.fields);
   const row = await tx(async (c) => {
-    // renamed fields carry their values along on every page using the schema
+    // renamed fields carry their values along on every page using the schema – all renames in one
+    // statement, so swapped labels (A→B, B→A) do not overwrite each other
+    const renames = [];
     for (const f of fields) {
       const before = old.fields.find((x) => x.id === f.id);
-      if (before && before.label !== f.label) {
-        await c.query(
-          `UPDATE pages SET properties = (properties - $2::text) || jsonb_build_object($3::text, properties->$2::text)
-            WHERE schema_id=$1 AND properties ? $2::text`,
-          [id, before.label, f.label],
-        );
-      }
+      if (before && before.label !== f.label) renames.push([before.label, f.label]);
+    }
+    if (renames.length) {
+      await c.query(
+        `UPDATE pages SET properties = (properties - $2::text[]) || (
+           SELECT coalesce(jsonb_object_agg(r.dst, properties->r.src), '{}'::jsonb)
+             FROM unnest($2::text[], $3::text[]) AS r(src, dst) WHERE properties ? r.src)
+          WHERE schema_id=$1 AND properties ?| $2::text[]`,
+        [id, renames.map((r) => r[0]), renames.map((r) => r[1])],
+      );
     }
     const { rows } = await c.query(
       'UPDATE sheet_schemas SET name=$2, description=$3, page_type=$4, fields=$5, updated_at=now() WHERE id=$1 RETURNING *',

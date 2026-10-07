@@ -8,7 +8,8 @@ import { audit } from '../lib/audit.js';
 const router = Router();
 router.use(requireAuth);
 
-const KEY = /^[a-z0-9][a-z0-9-]{1,30}$/;
+// not purely numeric: loadSpace() would read such a key as a space id
+const KEY = /^(?!\d+$)[a-z0-9][a-z0-9-]{1,30}$/;
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
 const spaceSchema = {

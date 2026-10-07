@@ -12,10 +12,13 @@ export const forbidden = (msg = 'Keine Berechtigung') => new HttpError(403, msg)
 export const notFound = (msg = 'Nicht gefunden') => new HttpError(404, msg);
 export const conflict = (msg) => new HttpError(409, msg);
 
+/** Postgres "integer" range – larger values would fail in the query with a 500 */
+const INT4_MAX = 2147483647;
+
 /** Parse a positive integer id from a route param or throw 400 */
 export function intParam(value, name = 'id') {
   const n = Number(value);
-  if (!Number.isInteger(n) || n <= 0) throw badRequest(`Ungültige ${name}`);
+  if (!Number.isInteger(n) || n <= 0 || n > INT4_MAX) throw badRequest(`Ungültige ${name}`);
   return n;
 }
 
@@ -44,7 +47,7 @@ export function pick(body, schema, { partial = false } = {}) {
       }
       case 'int': {
         const n = Number(v);
-        if (!Number.isInteger(n)) throw badRequest(`Feld "${key}" muss eine Ganzzahl sein`);
+        if (!Number.isInteger(n) || Math.abs(n) > INT4_MAX) throw badRequest(`Feld "${key}" muss eine Ganzzahl sein`);
         out[key] = n;
         break;
       }
