@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bastion}
+      POSTGRES_USER: ${POSTGRES_USER:-bastion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    image: bastion-wiki:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BASTION_PORT:-8080}:3000"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-bastion}
+      POSTGRES_USER: ${POSTGRES_USER:-bastion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
+      SESSION_DAYS: ${SESSION_DAYS:-14}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      SEED_DEMO_CONTENT: ${SEED_DEMO_CONTENT:-true}
+    volumes:
+      - uploads:/data
+
+volumes:
+  db_data:
+  uploads:
+    name: bastion_uploads
