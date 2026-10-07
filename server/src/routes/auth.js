@@ -13,6 +13,7 @@ import { ldapAuthenticate, upsertExternalUser } from '../lib/directory.js';
 import { authorizationUrl, handleCallback } from '../lib/oidc.js';
 import { encrypt, tryDecrypt } from '../lib/crypto.js';
 import { generateSecret, otpauthUri, recoveryCodes, verifyTotp } from '../lib/totp.js';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -89,6 +90,11 @@ router.post('/auth/login/totp', async (req, res) => {
     throw unauthorized('Anmeldung abgelaufen – bitte erneut versuchen');
   }
   c.tries += 1;
+  // per account, not per challenge: a known password must not allow unlimited fresh challenges
+  if (!loginRateLimit(`totp|${c.userId}`)) {
+    challenges.delete(challenge);
+    throw badRequest('Zu viele Anmeldeversuche – bitte in 15 Minuten erneut versuchen');
+  }
   const user = await one('SELECT * FROM users WHERE id=$1 AND is_active', [c.userId]);
   if (!user) throw unauthorized();
   const ok = await checkSecondFactor(user, code);
@@ -97,6 +103,7 @@ router.post('/auth/login/totp', async (req, res) => {
     throw unauthorized('Code ungültig');
   }
   challenges.delete(challenge);
+  resetLoginRateLimit(`totp|${c.userId}`);
   await finishLogin(req, res, user, `${c.method}+totp${ok === 'recovery' ? '-recovery' : ''}`);
 });
 
@@ -105,36 +112,49 @@ async function checkSecondFactor(user, code) {
   const secret = tryDecrypt(user.totp_secret);
   const counter = secret ? verifyTotp(secret, code) : null;
   if (counter !== null) {
-    if (lastTotp.get(user.id) === counter) return false;
+    // codes from one step either side are accepted, so anything not newer than the last one is a replay
+    if (counter <= (lastTotp.get(user.id) ?? -1)) return false;
     lastTotp.set(user.id, counter);
     return true;
   }
   const hash = sha256(String(code).trim().toLowerCase());
-  const codes = user.totp_recovery || [];
-  if (codes.includes(hash)) {
-    await query('UPDATE users SET totp_recovery=$2 WHERE id=$1', [user.id, JSON.stringify(codes.filter((h) => h !== hash))]);
-    return 'recovery';
-  }
-  return false;
+  // atomic, so two concurrent requests cannot both use the same recovery code
+  const { rowCount } = await query(
+    'UPDATE users SET totp_recovery = totp_recovery - $2::text WHERE id=$1 AND totp_recovery ? $2::text',
+    [user.id, hash],
+  );
+  return rowCount ? 'recovery' : false;
 }
 
 // ------------------------------------------------------------------ OpenID Connect
-const safeNext = (n) => (typeof n === 'string' && n.startsWith('/') && !n.startsWith('//') ? n : '/');
+// same-site path only: "//host", "/\host" and control characters would let browsers leave the site
+const safeNext = (n) => (typeof n === 'string' && /^\/(?![/\\])/.test(n) && !/[\\\x00-\x1f]/.test(n) ? n : '/');
+const OIDC_COOKIE = 'bastion_oidc';
+const OIDC_COOKIE_PATH = '/api/auth/oidc';
 
 router.get('/auth/oidc/start', async (req, res) => {
   const cfg = await getSection('oidc');
   if (!cfg.enabled || !cfg.issuer || !cfg.clientId) throw notFound('Single Sign-on ist nicht eingerichtet');
   const redirectUri = `${await publicBase(req)}/api/auth/oidc/callback`;
-  res.redirect(await authorizationUrl(cfg, { redirectUri, next: safeNext(req.query.next) }));
+  const url = await authorizationUrl(cfg, { redirectUri, next: safeNext(req.query.next) });
+  // bind the state to this browser, so a callback URL cannot be replayed into someone else's browser (login CSRF)
+  res.cookie(OIDC_COOKIE, new URL(url).searchParams.get('state'), {
+    httpOnly: true, sameSite: 'lax', secure: config.cookieSecure, maxAge: 10 * 60 * 1000, path: OIDC_COOKIE_PATH,
+  });
+  res.redirect(url);
 });
 
 router.get('/auth/oidc/callback', async (req, res) => {
   const fail = (msg) => res.redirect(`/login?sso_error=${encodeURIComponent(msg)}`);
+  const state = String(req.query.state || '');
+  const boundState = req.cookies?.[OIDC_COOKIE];
+  res.clearCookie(OIDC_COOKIE, { path: OIDC_COOKIE_PATH });
   const cfg = await getSection('oidc');
   if (!cfg.enabled) return fail('Single Sign-on ist nicht eingerichtet');
   if (req.query.error) return fail(String(req.query.error_description || req.query.error).slice(0, 200));
+  if (!state || boundState !== state) return fail('Anmeldung abgelaufen – bitte erneut versuchen');
   try {
-    const { identity, next } = await handleCallback(cfg, { code: String(req.query.code || ''), state: String(req.query.state || '') });
+    const { identity, next } = await handleCallback(cfg, { code: String(req.query.code || ''), state });
     const user = await upsertExternalUser(cfg, identity);
     if (!user.is_active) return fail('Dieses Konto ist deaktiviert');
     await createSession(res, req, user.id);
@@ -301,7 +321,8 @@ router.post('/me/totp/disable', requireAuth, async (req, res) => {
   const { code } = pick(req.body, { code: { type: 'string', required: true, max: 40 } });
   if (!req.user.totp_enabled) return res.json({ ok: true });
   const security = await getSection('security');
-  if (twoFactorRequired(security, req.user)) throw badRequest('Zwei-Faktor-Anmeldung ist für dein Konto vorgeschrieben');
+  // evaluate the policy as if 2FA were off (twoFactorRequired() is false for accounts that already have it)
+  if (twoFactorRequired(security, { ...req.user, totp_enabled: false })) throw badRequest('Zwei-Faktor-Anmeldung ist für dein Konto vorgeschrieben');
   if (!(await checkSecondFactor(req.user, code))) throw badRequest('Code ungültig');
   await query("UPDATE users SET totp_secret=NULL, totp_enabled=false, totp_recovery='[]', updated_at=now() WHERE id=$1", [req.user.id]);
   await audit(req, 'user.totp_disabled', 'user', req.user.id);

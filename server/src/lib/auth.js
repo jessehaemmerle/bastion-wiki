@@ -54,7 +54,7 @@ export async function userPayload(u) {
  * Enforces the 2FA policy: until a second factor is set up, a browser session may only
  * reach what is needed to set it up (or sign out).
  */
-const TWO_FA_ALLOWED = [/^\/me$/, /^\/me\/totp\//, /^\/auth\//, /^\/settings\/public$/, /^\/health$/];
+const TWO_FA_ALLOWED = [/^\/me$/, /^\/me\/totp\//, /^\/auth\//, /^\/settings\/public$/, /^\/health$/, /^\/public\/share\//];
 export async function enforce2fa(req, _res, next) {
   try {
     if (!req.user || req.authMethod !== 'session') return next();
@@ -168,7 +168,14 @@ export function loginRateLimit(key) {
   }
   entry.count += 1;
   attempts.set(key, entry);
-  if (attempts.size > 10000) attempts.clear();
+  if (attempts.size > 10000) {
+    // prune instead of clearing: a flood of throw-away usernames must not reset the counters of real targets
+    for (const [k, v] of attempts) if (now - v.since > windowMs || v.count < 3) attempts.delete(k);
+    for (const k of attempts.keys()) {
+      if (attempts.size <= 50000) break;
+      attempts.delete(k);
+    }
+  }
   return entry.count <= 10;
 }
 export const resetLoginRateLimit = (key) => attempts.delete(key);

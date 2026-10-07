@@ -206,6 +206,9 @@ async function main() {
   process.on('SIGINT', shutdown);
 }
 
+// Background work (scheduler ticks, fire-and-forget promises) must not take the whole server down
+process.on('unhandledRejection', (err) => console.error('[process] unhandled rejection:', err));
+
 main().catch((err) => {
   console.error(err);
   process.exit(1);

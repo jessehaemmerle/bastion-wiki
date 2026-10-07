@@ -21,7 +21,12 @@ export async function linkSecrets(c, pageId, spaceId, html) {
 export async function cloneSecrets(c, html, newPageId, userId) {
   let out = String(html || '');
   for (const id of secretIds(out)) {
-    const { rows: [s] } = await c.query('SELECT * FROM page_secrets WHERE id=$1', [id]);
+    // only secrets the user may reveal: an id copied from a page they can merely read must not become a readable copy
+    const { rows: [s] } = await c.query(
+      `SELECT * FROM page_secrets WHERE id=$1
+          AND (CASE WHEN page_id IS NULL THEN space_access(space_id, $2) ELSE page_access(page_id, $2) END) >= 2`,
+      [id, userId],
+    );
     if (!s) continue;
     const nid = newSecretId();
     await c.query(

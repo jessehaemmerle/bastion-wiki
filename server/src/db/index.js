@@ -7,6 +7,9 @@ pg.types.setTypeParser(1082, (v) => v);
 pg.types.setTypeParser(20, (v) => Number(v));
 
 export const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
+// An idle client losing its connection (database restart, network) emits 'error' on the pool –
+// without a listener that would crash the whole process.
+pool.on('error', (err) => console.error('[db] idle client error:', err.message));
 
 export const query = (text, params) => pool.query(text, params);
 
@@ -28,7 +31,8 @@ export async function tx(fn) {
     await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    // keep the original error even if the connection is gone and ROLLBACK fails too
+    await client.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     client.release();

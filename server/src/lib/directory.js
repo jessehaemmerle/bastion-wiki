@@ -107,8 +107,13 @@ function ldapClient(cfg) {
 
 async function openBound(cfg) {
   const client = ldapClient(cfg);
-  if (cfg.startTls) await client.startTLS(cfg.caCert ? { ca: [cfg.caCert] } : {});
-  if (cfg.bindDn) await client.bind(cfg.bindDn, cfg.bindPassword);
+  try {
+    if (cfg.startTls) await client.startTLS(cfg.caCert ? { ca: [cfg.caCert] } : {});
+    if (cfg.bindDn) await client.bind(cfg.bindDn, cfg.bindPassword);
+  } catch (err) {
+    await client.unbind().catch(() => {}); // do not leak the connection on every failed login
+    throw err;
+  }
   return client;
 }
 

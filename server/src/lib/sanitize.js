@@ -65,11 +65,11 @@ export function htmlToText(html) {
     { allowedTags: [], allowedAttributes: {} },
   )
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&') // last, so "&amp;lt;" stays "&lt;" instead of being decoded twice
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
