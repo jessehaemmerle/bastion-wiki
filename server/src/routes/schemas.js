@@ -17,7 +17,7 @@ router.get('/schemas', requireAuth, async (_req, res) => {
 /** Upcoming and overdue expiry dates (certificates, licences, contracts …) */
 router.get('/expiring', requireAuth, async (req, res) => {
   const days = Math.min(Math.max(Number(req.query.days) || 60, 0), 3650);
-  res.json({ items: await expiringFor(req.user.id, days), days });
+  res.json({ items: await expiringFor(req.user.id, days, { reviews: req.query.reviews !== '0' }), days });
 });
 
 const schemaBody = {

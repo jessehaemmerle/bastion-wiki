@@ -18,6 +18,21 @@ export const daysUntil = (iso) => {
   return Math.round((new Date(`${iso}T00:00:00Z`).getTime() - today) / 864e5);
 };
 
+/** Free data-sheet keys that name an expiry date (same rule as the server's Fristen list) */
+export const EXPIRY_KEY = /(gültig|gueltig|ablauf|läuft|laeuft|expir|valid|garantie|gewährleistung|warranty|laufzeit|vertragsende|support|end.of.life|\beol\b|renew|erneuer|wartung bis|maintenance until|frist|deadline)|\sbis$|\suntil$/i;
+
+/** 2026-10-17, 17.10.2026, 17.10.26, 2026/10/17 → ISO date or null */
+export function parseDate(value) {
+  const v = String(value ?? '').trim();
+  let m = v.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ].*)?$/);
+  let iso = m && `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  if (!iso && (m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?:\s.*)?$/))) {
+    iso = `${m[3].length === 2 ? `20${m[3]}` : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  const d = iso && new Date(`${iso}T00:00:00Z`);
+  return d && !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso ? iso : null;
+}
+
 /** Badge for expiry dates: overdue / within reminder window / fine */
 export function ExpiryBadge({ date, leadDays = 30 }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return null;

@@ -14,10 +14,12 @@ import Variables from '../components/Variables.jsx';
 import { EditorsBanner, References, RunsSection, ShareModal, StartRunModal } from '../components/PageExtras.jsx';
 import Comments from '../components/Comments.jsx';
 import { ApprovalSettingsModal, ChangeRequestModal, PendingBanner, PermissionsModal } from '../components/PageGovernance.jsx';
-import { FieldValue } from '../components/SheetFields.jsx';
+import { EXPIRY_KEY, ExpiryBadge, FieldValue, parseDate } from '../components/SheetFields.jsx';
 
-function PropValue({ value }) {
+function PropValue({ name, value }) {
   if (/^https?:\/\/\S+$/.test(value)) return <a href={value} target="_blank" rel="noopener noreferrer">{value}</a>;
+  const due = EXPIRY_KEY.test(name) && parseDate(value);
+  if (due) return <span className="row" style={{ gap: 6 }}>{value} <ExpiryBadge date={due} /></span>;
   return <span>{value || '—'}</span>;
 }
 
@@ -309,7 +311,7 @@ export default function PageView() {
                     <div className="spec-item" key={k}>
                       <div className="k">{k}</div>
                       <div className="v">
-                        {field ? <FieldValue field={field} value={v} /> : <PropValue value={v} />}
+                        {field ? <FieldValue field={field} value={v} /> : <PropValue name={k} value={v} />}
                         {v && (
                           <button onClick={() => copy(v, k)} title={tr('Kopieren')} aria-label={`${k} kopieren`}>
                             <Icon name={copied === k ? 'check' : 'copy'} size={13} />

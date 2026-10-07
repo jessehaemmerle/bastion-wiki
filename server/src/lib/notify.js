@@ -271,7 +271,7 @@ export async function checkReviews() {
 /** Expiry dates inside their reminder window → one notification per page, field and date */
 export async function checkExpiry() {
   let sent = 0;
-  for (const it of await expiringFor(null, 3650)) {
+  for (const it of await expiringFor(null, 3650, { reviews: false })) {
     if (it.daysLeft > it.leadDays) continue;
     const ins = await query('INSERT INTO expiry_notified (page_id, field, due) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [it.pageId, it.field, it.due]);
     if (!ins.rowCount) continue;

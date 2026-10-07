@@ -82,30 +82,57 @@ export const mapSchema = (s) => s && ({
   id: s.id, name: s.name, description: s.description, pageType: s.page_type, fields: s.fields, updatedAt: s.updated_at,
 });
 
+/** Free (schema-less) data-sheet keys that name an expiry date, e.g. „Gültig bis“, „Garantie“, „Valid until“ */
+export const EXPIRY_KEY = /(gültig|gueltig|ablauf|läuft|laeuft|expir|valid|garantie|gewährleistung|warranty|laufzeit|vertragsende|support|end.of.life|\beol\b|renew|erneuer|wartung bis|maintenance until|frist|deadline)|\sbis$|\suntil$/i;
+
+/** Accepts 2026-10-17, 2026-10-17 12:00, 17.10.2026, 17.10.26 and 2026/10/17 → ISO date or null */
+export function parseDate(value) {
+  const v = String(value ?? '').trim();
+  let m = v.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ].*)?$/);
+  let iso = m && `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  if (!iso && (m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?:\s.*)?$/))) {
+    iso = `${m[3].length === 2 ? `20${m[3]}` : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  return iso && validDate(iso) ? iso : null;
+}
+
 /**
- * Expiry dates the user can see: [{ pageId, title, field, due, daysLeft, leadDays, … }]
+ * Deadlines the user can see: [{ pageId, title, kind, field, due, daysLeft, leadDays, … }]
+ * kind: 'schema' (date field with „Ablauf überwachen“), 'field' (free field such as „Gültig bis“), 'review' (page review date).
  * days = horizon; overdue entries are always included.
  */
-export async function expiringFor(userId, days = 60) {
+export async function expiringFor(userId, days = 60, { reviews = true } = {}) {
   const rows = await many(
-    `SELECT p.id, p.title, p.properties, p.page_type, p.space_id, s.fields, sp.key AS space_key, sp.name AS space_name, sp.color AS space_color
-       FROM pages p JOIN sheet_schemas s ON s.id=p.schema_id JOIN spaces sp ON sp.id=p.space_id
-      WHERE s.fields @> '[{"expiry": true}]' ${userId ? 'AND page_access(p.id, $1) >= 1' : ''}`,
+    `SELECT p.id, p.title, p.properties, p.page_type, p.space_id, p.review_due::text AS review_due, s.fields,
+            sp.key AS space_key, sp.name AS space_name, sp.color AS space_color
+       FROM pages p LEFT JOIN sheet_schemas s ON s.id=p.schema_id JOIN spaces sp ON sp.id=p.space_id
+      WHERE (p.properties <> '{}'::jsonb OR p.review_due IS NOT NULL) ${userId ? 'AND page_access(p.id, $1) >= 1' : ''}`,
     userId ? [userId] : [],
   );
   const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`).getTime();
   const out = [];
+  const add = (r, kind, field, due, leadDays) => {
+    const daysLeft = Math.round((new Date(`${due}T00:00:00Z`).getTime() - today) / 864e5);
+    if (daysLeft > days) return;
+    out.push({
+      pageId: r.id, title: r.title, pageType: r.page_type, spaceId: r.space_id, kind, field, due, daysLeft, leadDays,
+      spaceKey: r.space_key, spaceName: r.space_name, spaceColor: r.space_color,
+    });
+  };
   for (const r of rows) {
-    for (const f of r.fields.filter((x) => x.expiry)) {
-      const due = String(r.properties?.[f.label] || '').trim();
-      if (!validDate(due)) continue;
-      const daysLeft = Math.round((new Date(`${due}T00:00:00Z`).getTime() - today) / 864e5);
-      if (daysLeft > days) continue;
-      out.push({
-        pageId: r.id, title: r.title, pageType: r.page_type, spaceId: r.space_id, field: f.label, due, daysLeft, leadDays: f.leadDays,
-        spaceKey: r.space_key, spaceName: r.space_name, spaceColor: r.space_color,
-      });
+    const fields = r.fields || [];
+    const typed = new Set(fields.map((f) => f.label.toLowerCase()));
+    for (const f of fields.filter((x) => x.expiry)) {
+      const due = parseDate(r.properties?.[f.label]);
+      if (due) add(r, 'schema', f.label, due, f.leadDays);
     }
+    // Free fields: only keys the schema does not define (a schema date field without „Ablauf überwachen“ is a deliberate choice)
+    for (const [key, value] of Object.entries(r.properties || {})) {
+      if (typed.has(key.toLowerCase()) || !EXPIRY_KEY.test(key)) continue;
+      const due = parseDate(value);
+      if (due) add(r, 'field', key, due, 30);
+    }
+    if (reviews && r.review_due) add(r, 'review', 'Review', r.review_due.slice(0, 10), 14);
   }
   return out.sort((a, b) => a.due.localeCompare(b.due) || a.title.localeCompare(b.title));
 }

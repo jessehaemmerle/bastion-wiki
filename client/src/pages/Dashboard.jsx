@@ -40,7 +40,7 @@ export default function Dashboard() {
   const { data, loading } = useFetch('/dashboard');
   const [q, setQ] = useState('');
   const [expiring, setExpiring] = useState([]);
-  useEffect(() => { api.get('/expiring?days=30').then((d) => setExpiring(d.items)).catch(() => {}); }, []);
+  useEffect(() => { api.get('/expiring?days=30&reviews=0').then((d) => setExpiring(d.items)).catch(() => {}); }, []);
   useChrome([{ label: tr('Start') }]);
 
   if (loading && !data) return <Spinner center />;
