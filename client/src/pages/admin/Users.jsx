@@ -50,13 +50,19 @@ function UserModal({ user, groups, onClose, onSaved }) {
           {f.role === 'viewer' && tr('Kann nur lesen – auch wenn ein Bereich Schreibrechte vergibt.')}
         </span>
       </div>
-      <div className="field">
-        <label>{user ? tr('Neues Passwort (leer lassen = unverändert)') : tr('Passwort')}</label>
-        <div className="row">
-          <input className="input mono" value={f.password} onChange={(e) => set('password', e.target.value)} placeholder={tr('mind. 8 Zeichen')} />
-          <button className="btn" type="button" onClick={genPw} title={tr('Zufällig generieren')}><Icon name="wand" /></button>
+      {(!user || user.authSource === 'local') ? (
+        <div className="field">
+          <label>{user ? tr('Neues Passwort (leer lassen = unverändert)') : tr('Passwort')}</label>
+          <div className="row">
+            <input className="input mono" value={f.password} onChange={(e) => set('password', e.target.value)} placeholder={tr('mind. 8 Zeichen')} />
+            <button className="btn" type="button" onClick={genPw} title={tr('Zufällig generieren')}><Icon name="wand" /></button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="small muted">{user.authSource === 'ldap'
+          ? tr('Konto aus dem Verzeichnisdienst – Passwort wird dort verwaltet. Rolle und Gruppen werden bei der Anmeldung abgeglichen, falls eine Gruppenzuordnung eingerichtet ist.')
+          : tr('Single-Sign-on-Konto – Anmeldung über den Identitätsanbieter. Rolle und Gruppen werden bei der Anmeldung abgeglichen, falls eine Gruppenzuordnung eingerichtet ist.')}</div>
+      )}
       <div className="field">
         <label>{tr('Gruppen')}</label>
         <div className="row wrap">
@@ -102,13 +108,23 @@ export default function Users() {
                     <td><div className="row"><Avatar name={u.displayName} size={30} /><div><div style={{ fontWeight: 600 }}>{u.displayName}</div><div className="small muted">{u.username}{u.email ? `, ${u.email}` : ''}</div></div></div></td>
                     <td><span className={`badge ${u.role === 'admin' ? 'accent' : ''}`}>{ROLE_LABELS[u.role]}</span></td>
                     <td><div className="row wrap" style={{ gap: 4 }}>{u.groups.map((g) => <span key={g} className="badge">{g}</span>)}</div></td>
-                    <td>{u.isActive ? <span className="badge success">{tr('aktiv')}</span> : <span className="badge danger">{tr('deaktiviert')}</span>}</td>
+                    <td>
+                      <div className="row wrap" style={{ gap: 4 }}>
+                        {u.isActive ? <span className="badge success">{tr('aktiv')}</span> : <span className="badge danger">{tr('deaktiviert')}</span>}
+                        {u.authSource !== 'local' && <span className="badge mono">{u.authSource === 'ldap' ? 'LDAP' : 'SSO'}</span>}
+                        {u.totpEnabled && <span className="badge" title={tr('Zwei-Faktor-Anmeldung aktiv')}>2FA</span>}
+                      </div>
+                    </td>
                     <td className="small faint nowrap">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : tr('nie')}</td>
                     <td className="mono small">{u.edits}</td>
                     <td className="actions">
                       <Dropdown trigger={({ toggle }) => <button className="btn ghost icon sm" onClick={toggle} aria-label={tr('Aktionen')}><Icon name="more" size={15} /></button>}>
                         <MenuItem icon="edit" onClick={() => setEdit(u)}>{tr('Bearbeiten')}</MenuItem>
                         <MenuItem icon="log-out" onClick={async () => { await api.del(`/admin/users/${u.id}/sessions`); toast(tr('Alle Sitzungen beendet')); }}>{tr('Abmelden erzwingen')}</MenuItem>
+                        {u.totpEnabled && <MenuItem icon="smartphone" onClick={async () => {
+                          if (!confirm(tr('Zwei-Faktor-Anmeldung für {name} zurücksetzen? Die Person kann sich danach nur mit Passwort anmelden und muss 2FA neu einrichten.', { name: u.displayName }))) return;
+                          try { await api.patch(`/admin/users/${u.id}`, { reset2fa: true }); toast(tr('2FA zurückgesetzt')); reload(); } catch (e) { toast(e.message, 'error'); }
+                        }}>{tr('2FA zurücksetzen')}</MenuItem>}
                         {u.id !== me.id && <MenuItem icon={u.isActive ? 'lock' : 'check'} onClick={async () => {
                           try { await api.patch(`/admin/users/${u.id}`, { isActive: !u.isActive }); reload(); } catch (e) { toast(e.message, 'error'); }
                         }}>{u.isActive ? tr('Deaktivieren') : tr('Aktivieren')}</MenuItem>}

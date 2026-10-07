@@ -1,4 +1,5 @@
 import { many, query } from '../db/index.js';
+import { getSection } from './integrations.js';
 
 export const DEFAULT_SETTINGS = {
   siteName: 'Bastion',
@@ -30,7 +31,17 @@ export async function getSettings() {
 
 export async function getPublicSettings() {
   const s = await getSettings();
-  return Object.fromEntries(PUBLIC_KEYS.map((k) => [k, s[k]]));
+  const [oidc, ldap, security] = await Promise.all([getSection('oidc'), getSection('ldap'), getSection('security')]);
+  return {
+    ...Object.fromEntries(PUBLIC_KEYS.map((k) => [k, s[k]])),
+    auth: {
+      oidc: oidc.enabled && oidc.issuer && oidc.clientId ? { label: oidc.buttonLabel || 'Single Sign-on' } : null,
+      ldap: Boolean(ldap.enabled && ldap.url),
+      localLogin: security.localLogin,
+    },
+    allowSharing: security.allowSharing,
+    maxShareDays: security.maxShareDays,
+  };
 }
 
 export async function updateSettings(patch) {

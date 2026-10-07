@@ -11,6 +11,7 @@ import { useApp } from '../lib/context.jsx';
 import { useChrome } from '../lib/hooks.js';
 import { PAGE_TYPES, timeAgo } from '../lib/format.js';
 import { getLanguage, getLocale, tr } from '../lib/i18n.js';
+import { EditorsBanner } from '../components/PageExtras.jsx';
 
 const draftKey = (id) => `bastion.draft.${id || 'new'}`;
 
@@ -59,6 +60,7 @@ export default function PageEdit({ isNew = false }) {
   const [draft, setDraft] = useState(null);
   const [tree, setTree] = useState(null);
   const [showMeta, setShowMeta] = useState(true);
+  const [editors, setEditors] = useState([]);
   const formRef = useRef(form);
   formRef.current = form;
 
@@ -120,6 +122,20 @@ export default function PageEdit({ isNew = false }) {
     window.addEventListener('beforeunload', onUnload);
     return () => window.removeEventListener('beforeunload', onUnload);
   }, [dirty]);
+
+  // tell others we are editing (heartbeat) and learn who else is
+  useEffect(() => {
+    if (isNew || !id) return undefined;
+    let stopped = false;
+    const beat = () => api.post(`/pages/${id}/presence`).then((d) => !stopped && setEditors(d.editors)).catch(() => {});
+    beat();
+    const t = setInterval(beat, 20000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+      api.del(`/pages/${id}/presence`).catch(() => {});
+    };
+  }, [id, isNew]);
 
   const space = spaces.find((s) => s.key === form?.spaceKey);
   useChrome(
@@ -203,6 +219,7 @@ export default function PageEdit({ isNew = false }) {
           </div>
         )}
 
+        <EditorsBanner editors={editors} editing />
         <div className="row between wrap">
           <span className="eyebrow">{isNew ? tr('Neue Seite') : tr('Version {n} bearbeiten', { n: page.version })}</span>
           <button className="btn ghost sm" onClick={() => setShowMeta((s) => !s)}>
@@ -264,7 +281,8 @@ export default function PageEdit({ isNew = false }) {
         )}
         {!showMeta && form.tags.length > 0 && <div className="page-tags" style={{ margin: '10px 0' }}>{form.tags.map((t) => <TagPill key={t} name={t} link={false} />)}</div>}
 
-        <Editor key={editorKey} content={form.content} onChange={onContent} onUpload={onUpload} onSaveShortcut={save} />
+        <Editor key={editorKey} content={form.content} onChange={onContent} onUpload={onUpload} onSaveShortcut={save}
+          secretContext={{ spaceId: space?.id ?? page?.spaceId, pageId: page?.id }} />
 
         <div className="editor-actions">
           <span className="status">

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
@@ -8,7 +9,7 @@ import { config } from './config.js';
 import { pool } from './db/index.js';
 import { migrate } from './db/migrate.js';
 import { bootstrap } from './db/seed.js';
-import { authenticate, csrfGuard } from './lib/auth.js';
+import { authenticate, csrfGuard, enforce2fa } from './lib/auth.js';
 import { HttpError } from './lib/http.js';
 import { getPublicSettings } from './lib/settings.js';
 import authRoutes from './routes/auth.js';
@@ -20,7 +21,18 @@ import attachmentRoutes from './routes/attachments.js';
 import templateRoutes from './routes/templates.js';
 import adminRoutes from './routes/admin.js';
 import importRoutes from './routes/imports.js';
+import integrationRoutes from './routes/integrations.js';
+import secretRoutes from './routes/secrets.js';
+import activityRoutes from './routes/activity.js';
+import runRoutes from './routes/runs.js';
+import inventoryRoutes from './routes/inventory.js';
+import shareRoutes, { publicRouter as publicShareRoutes } from './routes/shares.js';
+import operationsRoutes from './routes/operations.js';
+import { ensureLinkIndex } from './lib/links.js';
+import { startScheduler } from './lib/scheduler.js';
+import { metricsMiddleware, renderMetrics } from './lib/metrics.js';
 import { recoverJobs } from './importers/jobs.js';
+import { initCrypto } from './lib/crypto.js';
 
 const app = express();
 app.set('trust proxy', config.trustProxy);
@@ -45,6 +57,7 @@ app.use(
     hsts: config.cookieSecure,
   }),
 );
+app.use(metricsMiddleware);
 app.use(compression());
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
@@ -61,8 +74,14 @@ api.get('/health', async (_req, res) => {
 });
 api.use(authenticate);
 api.use(csrfGuard);
+api.use(enforce2fa);
 api.get('/settings/public', async (_req, res) => res.json({ settings: await getPublicSettings() }));
+api.use(publicShareRoutes);
 api.use(authRoutes);
+api.use(activityRoutes);
+api.use(secretRoutes);
+api.use(inventoryRoutes);
+api.use(shareRoutes);
 api.use(spaceRoutes);
 api.use(pageRoutes);
 api.use(searchRoutes);
@@ -70,6 +89,9 @@ api.use(tagRoutes);
 api.use(attachmentRoutes);
 api.use(templateRoutes);
 api.use(importRoutes);
+api.use(integrationRoutes);
+api.use(operationsRoutes);
+api.use(runRoutes);
 api.use(adminRoutes);
 api.use((_req, _res, next) => next(new HttpError(404, 'API-Endpunkt nicht gefunden')));
 api.use((err, req, res, _next) => {
@@ -84,6 +106,24 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
 }, api);
+
+// ------------------------------------------------------------------ Prometheus
+// Bearer METRICS_TOKEN, or an admin session / admin API token
+app.get('/metrics', authenticate, async (req, res, next) => {
+  try {
+    const token = process.env.METRICS_TOKEN;
+    const bearer = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    const [got, want] = [Buffer.from(bearer), Buffer.from(token || '')];
+    const tokenOk = Boolean(token) && got.length === want.length && crypto.timingSafeEqual(got, want);
+    if (!tokenOk && req.user?.role !== 'admin') {
+      res.setHeader('WWW-Authenticate', 'Bearer');
+      return res.status(401).type('text/plain').send('unauthorized\n');
+    }
+    res.type('text/plain; version=0.0.4').send(await renderMetrics());
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ------------------------------------------------------------------ PWA manifest (reflects branding settings)
 app.get('/manifest.webmanifest', async (_req, res) => {
@@ -136,9 +176,12 @@ if (fs.existsSync(config.publicDir)) {
 }
 
 async function main() {
+  initCrypto();
   await migrate();
   await bootstrap();
   await recoverJobs();
+  await ensureLinkIndex();
+  startScheduler();
   const server = app.listen(config.port, () => console.log(`[web] Bastion läuft auf http://0.0.0.0:${config.port}`));
   const shutdown = () => {
     console.log('[web] shutting down');

@@ -8,6 +8,7 @@ import './styles/themes.css';
 import './styles/app.css';
 import './styles/content.css';
 import './styles/admin.css';
+import './styles/ops.css';
 import { AppProvider } from './lib/context.jsx';
 import App from './App.jsx';
 

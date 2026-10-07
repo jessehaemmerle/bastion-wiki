@@ -8,7 +8,7 @@ import { tr } from '../../lib/i18n.js';
 
 function GroupModal({ group, users, onClose, onSaved }) {
   const { toast } = useApp();
-  const [f, setF] = useState({ name: group?.name || '', description: group?.description || '', memberIds: group?.members.map((m) => m.id) || [] });
+  const [f, setF] = useState({ name: group?.name || '', description: group?.description || '', externalName: group?.externalName || '', memberIds: group?.members.map((m) => m.id) || [] });
   const [q, setQ] = useState('');
   const save = async () => {
     try {
@@ -27,6 +27,11 @@ function GroupModal({ group, users, onClose, onSaved }) {
       <div className="form-grid">
         <div className="field"><label>{tr('Name')}</label><input className="input" autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={tr('z. B. Netzwerk-Team')} /></div>
         <div className="field"><label>{tr('Beschreibung')}</label><input className="input" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
+        <div className="field span-2">
+          <label htmlFor="g-ext">{tr('Externer Name (LDAP-/SSO-Gruppe)')}</label>
+          <input id="g-ext" className="input mono" value={f.externalName} onChange={(e) => setF({ ...f, externalName: e.target.value })} placeholder="cn=netzwerk,ou=groups,dc=corp,dc=local" />
+          <span className="hint">{tr('Optional. Mitglieder dieser Verzeichnis- bzw. SSO-Gruppe werden bei der Anmeldung automatisch hinzugefügt und wieder entfernt.')}</span>
+        </div>
       </div>
       <div className="field">
         <label>{tr('Mitglieder ({n})', { n: f.memberIds.length })}</label>
@@ -69,7 +74,7 @@ export default function Groups() {
                   <button className="btn ghost icon sm" onClick={() => setDel(g)} aria-label={tr('Löschen')}><Icon name="trash" size={14} /></button>
                 </div>
               </div>
-              <div className="small muted">{g.description || tr('Keine Beschreibung')}</div>
+              <div className="small muted">{g.description || tr('Keine Beschreibung')}{g.externalName && <span className="mono"> · ⇄ {g.externalName}</span>}</div>
               <div className="row" style={{ gap: 0 }}>
                 {g.members.slice(0, 8).map((m, i) => <span key={m.id} style={{ marginLeft: i ? -8 : 0 }}><Avatar name={m.displayName} size={28} /></span>)}
                 {g.members.length > 8 && <span className="faint small" style={{ marginLeft: 6 }}>+{g.members.length - 8}</span>}

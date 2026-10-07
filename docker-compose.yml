@@ -39,6 +39,11 @@ services:
       SEED_DEMO_CONTENT: ${SEED_DEMO_CONTENT:-true}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-de}
       IMPORT_MAX_MB: ${IMPORT_MAX_MB:-1024}
+      # verschlüsselt Geheimnis-Blöcke, 2FA-Schlüssel und gespeicherte Passwörter – leer = Schlüsseldatei im Daten-Volume
+      SECRET_KEY: ${SECRET_KEY:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      TZ: ${TZ:-Europe/Berlin}
     volumes:
       - uploads:/data
 

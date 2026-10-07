@@ -9,6 +9,7 @@ import { audit } from '../lib/audit.js';
 import { DEFAULT_SETTINGS, getSettings, updateSettings } from '../lib/settings.js';
 import { mapSpace } from './spaces.js';
 import { uploadDir } from './attachments.js';
+import { ensureLinkIndex } from '../lib/links.js';
 
 const router = Router();
 router.use('/admin', requireRole('admin'));
@@ -110,9 +111,11 @@ router.patch('/admin/users/:id', async (req, res) => {
     isActive: { type: 'bool' },
     password: { type: 'string', trim: false },
     groupIds: { type: 'array' },
+    reset2fa: { type: 'bool' },
   }, { partial: true });
   const target = await one('SELECT * FROM users WHERE id=$1', [id]);
   if (!target) throw notFound('Benutzer nicht gefunden');
+  if (b.password && target.auth_source !== 'local') throw badRequest('Das Passwort wird im Verzeichnis bzw. beim Identitätsanbieter verwaltet');
   if (id === req.user.id && (b.role && b.role !== 'admin' || b.isActive === false)) {
     throw badRequest('Du kannst dir nicht selbst die Admin-Rechte entziehen oder dich deaktivieren');
   }
@@ -136,6 +139,7 @@ router.patch('/admin/users/:id', async (req, res) => {
       await c.query('DELETE FROM group_members WHERE user_id=$1', [id]);
       for (const gid of b.groupIds) await c.query('INSERT INTO group_members (group_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [intParam(gid), id]);
     }
+    if (b.reset2fa) await c.query("UPDATE users SET totp_secret=NULL, totp_enabled=false, totp_recovery='[]' WHERE id=$1", [id]);
     if (b.isActive === false || b.password) await c.query('DELETE FROM sessions WHERE user_id=$1', [id]);
     return rows[0];
   });
@@ -177,12 +181,13 @@ router.get('/admin/groups', async (_req, res) => {
        FROM groups g LEFT JOIN group_members m ON m.group_id=g.id LEFT JOIN users u ON u.id=m.user_id
       GROUP BY g.id ORDER BY g.name`,
   );
-  res.json({ groups: rows.map((g) => ({ id: g.id, name: g.name, description: g.description, members: g.members, spaceCount: g.space_count, createdAt: g.created_at })) });
+  res.json({ groups: rows.map((g) => ({ id: g.id, name: g.name, description: g.description, externalName: g.external_name || '', members: g.members, spaceCount: g.space_count, createdAt: g.created_at })) });
 });
 
 const groupSchema = {
   name: { type: 'string', max: 60, required: true },
   description: { type: 'string', max: 300 },
+  externalName: { type: 'string', max: 500 },
   memberIds: { type: 'array' },
 };
 
@@ -197,7 +202,7 @@ router.post('/admin/groups', async (req, res) => {
   const b = pick(req.body, groupSchema);
   if (await one('SELECT 1 FROM groups WHERE lower(name)=lower($1)', [b.name])) throw conflict('Gruppe existiert bereits');
   const group = await tx(async (c) => {
-    const { rows } = await c.query('INSERT INTO groups (name, description) VALUES ($1,$2) RETURNING *', [b.name, b.description || '']);
+    const { rows } = await c.query('INSERT INTO groups (name, description, external_name) VALUES ($1,$2,$3) RETURNING *', [b.name, b.description || '', b.externalName || null]);
     await saveGroup(c, rows[0].id, b);
     return rows[0];
   });
@@ -210,7 +215,11 @@ router.patch('/admin/groups/:id', async (req, res) => {
   const b = pick(req.body, groupSchema, { partial: true });
   if (b.name && (await one('SELECT 1 FROM groups WHERE lower(name)=lower($1) AND id<>$2', [b.name, id]))) throw conflict('Gruppe existiert bereits');
   const group = await tx(async (c) => {
-    const { rows } = await c.query('UPDATE groups SET name=COALESCE($2,name), description=COALESCE($3,description) WHERE id=$1 RETURNING *', [id, b.name, b.description]);
+    const { rows } = await c.query(
+      `UPDATE groups SET name=COALESCE($2,name), description=COALESCE($3,description),
+              external_name=CASE WHEN $4::boolean THEN NULLIF($5,'') ELSE external_name END WHERE id=$1 RETURNING *`,
+      [id, b.name, b.description, 'externalName' in b, b.externalName ?? ''],
+    );
     if (!rows[0]) throw notFound();
     await saveGroup(c, id, b);
     return rows[0];
@@ -311,6 +320,8 @@ router.post('/admin/maintenance/:task', async (req, res) => {
       `DELETE FROM page_revisions r USING (
          SELECT id, row_number() OVER (PARTITION BY page_id ORDER BY version DESC) AS rn FROM page_revisions) x
        WHERE r.id = x.id AND x.rn > $1`, [keep])).rowCount;
+  } else if (task === 'reindex-links') {
+    result = await ensureLinkIndex(true);
   } else if (task === 'vacuum') {
     await query('VACUUM ANALYZE');
     result = 'ok';

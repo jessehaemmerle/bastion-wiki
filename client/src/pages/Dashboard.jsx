@@ -77,6 +77,21 @@ export default function Dashboard() {
           )}
         </div>
         <div>
+          {data?.runs?.length > 0 && (
+            <section>
+              <div className="section-h"><h2>{tr('Laufende Durchläufe')}</h2></div>
+              <div className="run-list">
+                {data.runs.map((r) => (
+                  <Link key={r.id} to={`/runs/${r.id}`} className="run-row running">
+                    <Icon name="play" size={15} />
+                    <span className="grow ellipsis">{r.title}{r.reason && <span className="faint"> · {r.reason}</span>}</span>
+                    <span className="mono small">{r.done}/{r.total}</span>
+                    <span className="faint small">{r.startedBy}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
           {data?.pinned?.length > 0 && (
             <section>
               <div className="section-h"><h2>{tr('Angepinnt')}</h2></div>

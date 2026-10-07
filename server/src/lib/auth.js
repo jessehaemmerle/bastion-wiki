@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
 import { one, query } from '../db/index.js';
-import { forbidden, unauthorized } from './http.js';
+import { forbidden, HttpError, unauthorized } from './http.js';
+import { getSection } from './integrations.js';
 
 export const SESSION_COOKIE = 'bastion_sid';
 const ROLE_RANK = { viewer: 1, editor: 2, admin: 3 };
@@ -11,7 +12,7 @@ export const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex')
 export const randomToken = (bytes = 32) => crypto.randomBytes(bytes).toString('base64url');
 
 export const hashPassword = (pw) => bcrypt.hash(pw, 12);
-export const verifyPassword = (pw, hash) => bcrypt.compare(pw, hash);
+export const verifyPassword = (pw, hash) => (String(hash).startsWith('$2') ? bcrypt.compare(pw, hash) : Promise.resolve(false));
 
 export function validatePassword(pw) {
   if (typeof pw !== 'string' || pw.length < 8) return 'Passwort muss mindestens 8 Zeichen lang sein';
@@ -32,7 +33,38 @@ export function publicUser(u) {
     preferences: u.preferences || {},
     lastLoginAt: u.last_login_at,
     createdAt: u.created_at,
+    authSource: u.auth_source || 'local',
+    totpEnabled: Boolean(u.totp_enabled),
   };
+}
+
+/** Whether the security policy demands TOTP for this account (SSO accounts rely on their identity provider) */
+export function twoFactorRequired(security, u) {
+  if (!u || u.auth_source === 'oidc' || u.totp_enabled) return false;
+  return security.require2fa === 'all' || (security.require2fa === 'admins' && u.role === 'admin');
+}
+
+/** User as sent to the own browser: public fields + policy flags */
+export async function userPayload(u) {
+  const security = await getSection('security');
+  return { ...publicUser(u), mustEnable2fa: twoFactorRequired(security, u) };
+}
+
+/**
+ * Enforces the 2FA policy: until a second factor is set up, a browser session may only
+ * reach what is needed to set it up (or sign out).
+ */
+const TWO_FA_ALLOWED = [/^\/me$/, /^\/me\/totp\//, /^\/auth\//, /^\/settings\/public$/, /^\/health$/];
+export async function enforce2fa(req, _res, next) {
+  try {
+    if (!req.user || req.authMethod !== 'session') return next();
+    const security = await getSection('security');
+    if (!twoFactorRequired(security, req.user)) return next();
+    if (TWO_FA_ALLOWED.some((re) => re.test(req.path))) return next();
+    next(new HttpError(403, 'Zwei-Faktor-Anmeldung muss zuerst eingerichtet werden'));
+  } catch (err) {
+    next(err);
+  }
 }
 
 export async function createSession(res, req, userId) {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorContent, ReactNodeViewRenderer, useEditor, useEditorState } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -15,6 +15,8 @@ import Superscript from '@tiptap/extension-superscript';
 import { lowlight } from '../../lib/highlight.js';
 import { Callout } from './Callout.js';
 import { SlashCommand } from './SlashCommand.js';
+import { Secret, SecretModal } from './Secret.jsx';
+import { MERMAID_SAMPLE } from './slashItems.js';
 import CodeBlockView from './CodeBlockView.jsx';
 import Icon from '../Icon.jsx';
 import { tr } from '../../lib/i18n.js';
@@ -41,7 +43,7 @@ function Btn({ icon, label, active, onClick, disabled, children }) {
   );
 }
 
-function Toolbar({ editor, onPickImage }) {
+function Toolbar({ editor, onPickImage, onSecret }) {
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -107,6 +109,8 @@ function Toolbar({ editor, onPickImage }) {
       <Btn icon="flame" label={tr('Gefahr')} onClick={() => c().toggleCallout('danger').run()} />
       <Btn icon="grid" label={tr('Tabelle einfügen')} active={s.table} onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
       <Btn icon="upload" label={tr('Bild einfügen')} onClick={onPickImage} />
+      <Btn icon="lock" label={tr('Geheimnis einfügen')} onClick={onSecret} />
+      <Btn icon="waypoints" label={tr('Diagramm (Mermaid)')} onClick={() => c().insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: MERMAID_SAMPLE }] }).run()} />
       <Btn icon="more" label={tr('Trennlinie')} onClick={() => c().setHorizontalRule().run()} />
       <span className="tb-sep" />
       <Btn label={tr('Linksbündig')} active={!s.alignCenter && !s.alignRight} onClick={() => c().setTextAlign('left').run()}>⟸</Btn>
@@ -131,9 +135,10 @@ function Toolbar({ editor, onPickImage }) {
  * WYSIWYG editor.
  * `onUpload(files)` must return [{ url, filename, mimeType }]. If missing, images are embedded as data URLs.
  */
-export default function Editor({ content, onChange, onUpload, placeholder, onSaveShortcut }) {
+export default function Editor({ content, onChange, onUpload, placeholder, onSaveShortcut, secretContext }) {
   const fileRef = useRef(null);
   const [dragging, setDragging] = useState(false);
+  const [secretModal, setSecretModal] = useState(null);
   const uploadRef = useRef(onUpload);
   uploadRef.current = onUpload;
   const saveRef = useRef(onSaveShortcut);
@@ -183,7 +188,8 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
       Subscript,
       Superscript,
       Callout,
-      SlashCommand.configure({ context: { pickImage: () => fileRef.current?.click() } }),
+      Secret,
+      SlashCommand.configure({ context: { pickImage: () => fileRef.current?.click(), newSecret: () => setSecretModal({ mode: 'new' }) } }),
     ],
     content,
     editorProps: {
@@ -217,6 +223,9 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
   });
   const editorRef = useRef(null);
   editorRef.current = editor;
+  useEffect(() => {
+    if (editor) editor.storage.secret.open = (s) => setSecretModal(s);
+  }, [editor]);
 
   if (!editor) return null;
   const words = editor.storage.characterCount?.words?.() ?? 0;
@@ -228,7 +237,7 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
       onDragOver={(e) => e.dataTransfer?.types?.includes('Files') && setDragging(true)}
       onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setDragging(false)}
     >
-      <Toolbar editor={editor} onPickImage={() => fileRef.current?.click()} />
+      <Toolbar editor={editor} onPickImage={() => fileRef.current?.click()} onSecret={() => setSecretModal({ mode: 'new' })} />
       <BubbleMenu editor={editor} shouldShow={({ editor: e, state }) => !state.selection.empty && !e.isActive('codeBlock') && !e.isActive('image')}>
         <div className="bubble">
           <Btn label={tr('Fett')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></Btn>
@@ -249,6 +258,7 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
         <span>{tr('{n} Wörter', { n: words })}</span>
       </div>
       {dragging && <div className="drop-hint">{tr('Dateien hier ablegen')}</div>}
+      {secretModal && <SecretModal state={secretModal} context={secretContext} editor={editor} onClose={() => setSecretModal(null)} />}
       <input
         ref={fileRef}
         type="file"

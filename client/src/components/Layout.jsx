@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import Icon from './Icon.jsx';
+import Icon, { PageIcon } from './Icon.jsx';
 import { Avatar, Dropdown, MenuItem } from './ui.jsx';
 import PageTree from './PageTree.jsx';
 import CommandPalette from './CommandPalette.jsx';
@@ -23,7 +23,7 @@ export function Logo({ size = 26, className = 'logo' }) {
 }
 
 export default function Layout() {
-  const { user, spaces, settings, treeVersion, setPaletteOpen, updatePreferences, logout, online } = useApp();
+  const { user, spaces, settings, treeVersion, setPaletteOpen, updatePreferences, logout, online, unread } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const [crumbs, setCrumbs] = useState([]);
@@ -54,6 +54,22 @@ export default function Layout() {
 
   useEffect(() => setMobileNav(false), [location.pathname]);
 
+  // favourites + recently viewed (refreshed when navigating)
+  const [quick, setQuick] = useState({ recent: [], favorites: [] });
+  const [openSections, setOpenSections] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bastion.sidebar.sections') || '{}'); } catch { return {}; }
+  });
+  const toggleSection = (k) => setOpenSections((o) => {
+    const n = { ...o, [k]: !(o[k] ?? true) };
+    try { localStorage.setItem('bastion.sidebar.sections', JSON.stringify(n)); } catch { /* ignore */ }
+    return n;
+  });
+  useEffect(() => {
+    if (user?.mustEnable2fa) return undefined;
+    const t = setTimeout(() => api.get('/me/recent').then(setQuick).catch(() => {}), 400);
+    return () => clearTimeout(t);
+  }, [location.pathname, treeVersion, user?.mustEnable2fa]);
+
   useEffect(() => {
     if (!currentSpace) { setTree(null); return; }
     let cancelled = false;
@@ -83,6 +99,22 @@ export default function Layout() {
           <NavLink to="/" end className="nav-item"><Icon name="home" size={16} /> {tr('Start')}</NavLink>
           <NavLink to="/review" className="nav-item"><Icon name="calendar-clock" size={16} /> {tr('Zu prüfen')}</NavLink>
           <NavLink to="/tags" className="nav-item"><Icon name="tags" size={16} /> {tr('Tags')}</NavLink>
+          <NavLink to="/inventory" className="nav-item"><Icon name="server" size={16} /> {tr('Inventar')}</NavLink>
+
+          {[['favorites', tr('Favoriten'), quick.favorites], ['recent', tr('Zuletzt angesehen'), quick.recent]].map(([key, label, items]) => items.length > 0 && (
+            <div className="sidebar-section quick" key={key}>
+              <button type="button" className="sidebar-section-head toggle" aria-expanded={openSections[key] ?? true} onClick={() => toggleSection(key)}>
+                <span>{label}</span>
+                <Icon name="chevron-down" size={14} className={(openSections[key] ?? true) ? '' : 'rot'} />
+              </button>
+              {(openSections[key] ?? true) && items.slice(0, key === 'recent' ? 6 : 10).map((p) => (
+                <NavLink key={p.id} to={`/p/${p.id}`} className="nav-item small quick-item" style={{ '--sc': p.spaceColor }}>
+                  <PageIcon icon={p.icon} fallback={key === 'favorites' ? 'star' : 'history'} size={14} />
+                  <span className="ellipsis">{p.title}</span>
+                </NavLink>
+              ))}
+            </div>
+          ))}
 
           <div className="sidebar-section">
             <div className="sidebar-section-head">
@@ -167,6 +199,10 @@ export default function Layout() {
             ))}
           </nav>
           <div className="topbar-actions">
+            <Link to="/notifications" className={`btn ghost icon bell ${unread ? 'has-unread' : ''}`} title={tr('Benachrichtigungen')} aria-label={unread ? tr('{n} ungelesene Benachrichtigungen', { n: unread }) : tr('Benachrichtigungen')}>
+              <Icon name={unread ? 'bell-ring' : 'bell'} size={17} />
+              {unread > 0 && <span className="bell-count">{unread > 99 ? '99+' : unread}</span>}
+            </Link>
             <button className="search-trigger" onClick={() => setPaletteOpen(true)} aria-label={tr('Suche öffnen')}>
               <Icon name="search" size={15} /> <span>{tr('Suchen')}</span> <span className="kbd">{tr('Strg K')}</span>
             </button>

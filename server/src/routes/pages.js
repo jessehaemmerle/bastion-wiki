@@ -1,11 +1,15 @@
 import { Router } from 'express';
-import TurndownService from 'turndown';
 import { many, one, query, tx } from '../db/index.js';
 import { requireAuth } from '../lib/auth.js';
 import { badRequest, conflict, intParam, notFound, pick, slugify } from '../lib/http.js';
 import { LEVEL, LEVEL_NAME, loadPage, loadSpace } from '../lib/permissions.js';
 import { sanitize, htmlToText } from '../lib/sanitize.js';
 import { audit } from '../lib/audit.js';
+import { backlinks, syncLinks } from '../lib/links.js';
+import { cloneSecrets, linkSecrets } from '../lib/secrets.js';
+import { notifyPageEvent } from '../lib/notify.js';
+import { editorsOf } from '../lib/presence.js';
+import { pageMarkdown, secretPlaceholdersHtml } from '../lib/markdown.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -80,6 +84,12 @@ async function assertParent(c, parentId, spaceId, selfId = null) {
   }
 }
 
+/** Authors follow their pages unless they opted out (Settings → Notifications) */
+async function autoWatch(c, user, pageId) {
+  if (user.preferences?.autoWatch === false) return;
+  await c.query('INSERT INTO watches (user_id, page_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [user.id, pageId]);
+}
+
 function mapListPage(p) {
   return {
     id: p.id, title: p.title, slug: p.slug, icon: p.icon, pageType: p.page_type,
@@ -119,7 +129,7 @@ router.get('/pages', async (req, res) => {
 
 router.get('/dashboard', async (req, res) => {
   const uid = req.user.id;
-  const [recent, favorites, overdue, mine, pinned, stats, activity] = await Promise.all([
+  const [recent, favorites, overdue, mine, pinned, stats, activity, runs] = await Promise.all([
     many(`${LIST_SELECT} WHERE space_access(p.space_id,$1) >= 1 ORDER BY p.updated_at DESC LIMIT 8`, [uid]),
     many(`${LIST_SELECT} JOIN favorites f ON f.page_id = p.id AND f.user_id = $1 WHERE space_access(p.space_id,$1) >= 1 ORDER BY f.created_at DESC LIMIT 12`, [uid]),
     many(`${LIST_SELECT} WHERE space_access(p.space_id,$1) >= 1 AND p.review_due < current_date + 7 ORDER BY p.review_due ASC LIMIT 8`, [uid]),
@@ -135,6 +145,11 @@ router.get('/dashboard', async (req, res) => {
             FROM page_revisions r JOIN pages p ON p.id = r.page_id
            WHERE r.created_at > now() - interval '30 days' AND space_access(p.space_id,$1) >= 1
            GROUP BY 1 ORDER BY 1`, [uid]),
+    many(`SELECT r.id, r.title, r.page_id, r.started_at, r.reason, u.display_name AS started_by,
+                 (SELECT count(*) FROM jsonb_array_elements(r.steps) x WHERE (x->>'done')::boolean)::int AS done,
+                 jsonb_array_length(r.steps) AS total
+            FROM runbook_runs r JOIN pages p ON p.id=r.page_id LEFT JOIN users u ON u.id=r.started_by
+           WHERE r.status='running' AND space_access(p.space_id,$1) >= 1 ORDER BY r.started_at DESC LIMIT 6`, [uid]),
   ]);
   res.json({
     recent: recent.map(mapListPage),
@@ -144,13 +159,14 @@ router.get('/dashboard', async (req, res) => {
     pinned: pinned.map(mapListPage),
     stats,
     activity,
+    runs: runs.map((r) => ({ id: r.id, title: r.title, pageId: r.page_id, startedAt: r.started_at, startedBy: r.started_by, reason: r.reason, done: r.done, total: r.total })),
   });
 });
 
 // ------------------------------------------------------------------ single page
 router.get('/pages/:id', async (req, res) => {
   const page = await loadPage(req.user, intParam(req.params.id));
-  const [space, tags, breadcrumbs, children, attachments, fav, authors] = await Promise.all([
+  const [space, tags, breadcrumbs, children, attachments, fav, authors, links, watch, runs] = await Promise.all([
     one('SELECT * FROM spaces WHERE id=$1', [page.space_id]),
     many('SELECT t.name, t.color FROM page_tags pt JOIN tags t ON t.id=pt.tag_id WHERE pt.page_id=$1 ORDER BY t.name', [page.id]),
     many(
@@ -171,7 +187,15 @@ router.get('/pages/:id', async (req, res) => {
          FROM pages p LEFT JOIN users c ON c.id=p.created_by LEFT JOIN users u ON u.id=p.updated_by WHERE p.id=$1`,
       [page.id],
     ),
+    backlinks(page.id, req.user.id),
+    one(`SELECT EXISTS (SELECT 1 FROM watches WHERE user_id=$1 AND page_id=$2) AS page,
+                EXISTS (SELECT 1 FROM watches WHERE user_id=$1 AND space_id=$3) AS space`, [req.user.id, page.id, page.space_id]),
+    one(`SELECT count(*)::int AS total, count(*) FILTER (WHERE status='running')::int AS running FROM runbook_runs WHERE page_id=$1`, [page.id]),
   ]);
+  query(
+    `INSERT INTO page_views (user_id, page_id) VALUES ($1,$2) ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at=now()`,
+    [req.user.id, page.id],
+  ).catch(() => {});
   res.json({
     page: {
       id: page.id, spaceId: page.space_id, parentId: page.parent_id, title: page.title, slug: page.slug,
@@ -186,6 +210,10 @@ router.get('/pages/:id', async (req, res) => {
         id: a.id, filename: a.filename, mimeType: a.mime_type, size: a.size_bytes, createdAt: a.created_at, uploadedBy: a.uploaded_by,
       })),
       space: { id: space.id, key: space.key, name: space.name, color: space.color, icon: space.icon },
+      backlinks: links.map((l) => ({ id: l.id, title: l.title, icon: l.icon, pageType: l.page_type, spaceKey: l.space_key, spaceName: l.space_name, spaceColor: l.space_color })),
+      watching: { page: watch.page, space: watch.space },
+      runs,
+      editors: editorsOf(page.id, req.user.id),
     },
   });
 });
@@ -215,9 +243,13 @@ router.post('/pages', async (req, res) => {
       [rows[0].id, b.title, content, properties, b.summary || 'Seite erstellt', req.user.id],
     );
     await setTags(c, rows[0].id, b.tags);
+    await syncLinks(c, rows[0].id, content);
+    await linkSecrets(c, rows[0].id, space.id, content);
+    await autoWatch(c, req.user, rows[0].id);
     return rows[0];
   });
   await audit(req, 'page.create', 'page', page.id, { title: page.title, space: space.key });
+  notifyPageEvent('page.create', { ...page, space_key: space.key, space_name: space.name }, req.user);
   res.status(201).json({ page: { id: page.id, slug: page.slug, spaceKey: space.key, version: page.version } });
 });
 
@@ -257,14 +289,22 @@ router.put('/pages/:id', async (req, res) => {
       );
     }
     if (b.tags) await setTags(c, current.id, b.tags);
+    if (content !== current.content) {
+      await syncLinks(c, current.id, content);
+      await linkSecrets(c, current.id, current.space_id, content);
+    }
+    if (contentChanged) await autoWatch(c, req.user, current.id);
     return rows[0];
   });
   await audit(req, 'page.update', 'page', page.id, { title: page.title, version: page.version });
+  if (contentChanged) notifyPageEvent('page.update', page, req.user, { version: page.version, summary: b.summary || '' });
   res.json({ page: { id: page.id, slug: page.slug, version: page.version, updatedAt: page.updated_at } });
 });
 
 router.delete('/pages/:id', async (req, res) => {
   const page = await loadPage(req.user, intParam(req.params.id), LEVEL.write);
+  // watchers are removed together with the page, so they hear about it first
+  await notifyPageEvent('page.delete', page, req.user);
   // Children move up one level instead of disappearing
   await tx(async (c) => {
     await c.query('UPDATE pages SET parent_id=$2 WHERE parent_id=$1', [page.id, page.parent_id]);
@@ -295,6 +335,11 @@ router.post('/pages/:id/move', async (req, res) => {
         [page.id, targetSpaceId],
       );
       await c.query('UPDATE pages SET space_id=$2, slug=$3 WHERE id=$1', [page.id, targetSpaceId, slug]);
+      await c.query(
+        `WITH RECURSIVE sub AS (SELECT id FROM pages WHERE id=$1 UNION ALL SELECT p.id FROM pages p JOIN sub ON p.parent_id=sub.id)
+         UPDATE page_secrets SET space_id=$2 WHERE page_id IN (SELECT id FROM sub)`,
+        [page.id, targetSpaceId],
+      );
     }
     const { rows: siblings } = await c.query(
       'SELECT id FROM pages WHERE space_id=$1 AND parent_id IS NOT DISTINCT FROM $2 AND id<>$3 ORDER BY sort_order, title',
@@ -327,6 +372,12 @@ router.post('/pages/:id/duplicate', async (req, res) => {
       [rows[0].id, title, page.content, page.properties, `Kopie von #${page.id}`, req.user.id],
     );
     await setTags(c, rows[0].id, tags.map((t) => t.name));
+    const content = await cloneSecrets(c, page.content, rows[0].id, req.user.id);
+    if (content !== page.content) {
+      await c.query('UPDATE pages SET content=$2 WHERE id=$1', [rows[0].id, content]);
+      await c.query('UPDATE page_revisions SET content=$2 WHERE page_id=$1', [rows[0].id, content]);
+    }
+    await syncLinks(c, rows[0].id, content);
     return rows[0];
   });
   await audit(req, 'page.duplicate', 'page', copy.id, { from: page.id });
@@ -388,26 +439,14 @@ router.post('/pages/:id/revisions/:version/restore', async (req, res) => {
       `INSERT INTO page_revisions (page_id, version, title, content, properties, summary, author_id) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [page.id, next, r.title, r.content, r.properties, `Wiederhergestellt aus Version ${version}`, req.user.id],
     );
+    await syncLinks(c, page.id, r.content);
+    await linkSecrets(c, page.id, page.space_id, r.content);
   });
   await audit(req, 'page.restore', 'page', page.id, { from: version, to: next });
   res.json({ version: next });
 });
 
 // ------------------------------------------------------------------ export
-const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-' });
-turndown.addRule('fencedLang', {
-  filter: (node) => node.nodeName === 'PRE' && node.firstChild?.nodeName === 'CODE',
-  replacement: (_c, node) => {
-    const code = node.firstChild;
-    const lang = (code.getAttribute('class') || '').match(/language-([\w+#-]+)/)?.[1] || '';
-    return `\n\n\`\`\`${lang}\n${code.textContent.replace(/\n$/, '')}\n\`\`\`\n\n`;
-  },
-});
-turndown.addRule('callout', {
-  filter: (node) => node.nodeName === 'DIV' && node.getAttribute('data-type') === 'callout',
-  replacement: (content, node) => `\n\n> **${(node.getAttribute('data-variant') || 'info').toUpperCase()}**\n${content.trim().split('\n').map((l) => `> ${l}`).join('\n')}\n\n`,
-});
-
 router.get('/pages/:id/export', async (req, res) => {
   const page = await loadPage(req.user, intParam(req.params.id));
   const format = req.query.format === 'html' ? 'html' : 'md';
@@ -418,15 +457,11 @@ router.get('/pages/:id/export', async (req, res) => {
     const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     return res.send(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${esc(page.title)}</title>
 <style>body{font-family:system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 16px;line-height:1.6}pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px}</style>
-</head><body><h1>${esc(page.title)}</h1>${page.content}</body></html>`);
+</head><body><h1>${esc(page.title)}</h1>${secretPlaceholdersHtml(page.content)}</body></html>`);
   }
-  const props = Object.entries(page.properties || {});
-  const front = props.length
-    ? `---\n${props.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n---\n\n`
-    : '';
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${name}.md"`);
-  res.send(`${front}# ${page.title}\n\n${turndown.turndown(page.content || '')}\n`);
+  res.send(pageMarkdown(page));
 });
 
 export default router;

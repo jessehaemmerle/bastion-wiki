@@ -9,6 +9,8 @@ import {
   Search, Server, ServerCog, Settings, Shield, ShieldCheck, Siren, Sparkles, Star, StarOff, Sun, Tag, Tags, Terminal, Trash2,
   Upload, User, UserCog, UserPlus, Users, Wifi, Workflow, Wrench, X, Zap, Wand2, Gauge, Layers, Key, Type, SquareTerminal,
   Brush, Briefcase, Building2, Truck, Headphones, Printer as PrinterIcon,
+  Play, CircleStop, Share2, Fingerprint, Smartphone, Webhook, Unlink, Timer, BellOff, BellRing, ArchiveRestore, ShieldAlert,
+  GitCommitHorizontal, LockKeyhole, Variable, Table2, Send, Waypoints, Link2Off, ArrowUpRight, RotateCw, CircleX,
 } from 'lucide-react';
 
 export const ICONS = {
@@ -32,6 +34,11 @@ export const ICONS = {
   'user-cog': UserCog, 'user-plus': UserPlus, users: Users, wifi: Wifi, workflow: Workflow, wrench: Wrench, x: X, zap: Zap,
   wand: Wand2, gauge: Gauge, layers: Layers, type: Type, brush: Brush, briefcase: Briefcase, building: Building2,
   truck: Truck, headphones: Headphones, 'printer-alt': PrinterIcon,
+  play: Play, stop: CircleStop, share: Share2, fingerprint: Fingerprint, smartphone: Smartphone, webhook: Webhook,
+  unlink: Unlink, timer: Timer, 'bell-off': BellOff, 'bell-ring': BellRing, 'archive-restore': ArchiveRestore,
+  'shield-alert': ShieldAlert, 'git-commit': GitCommitHorizontal, 'lock-keyhole': LockKeyhole, variable: Variable,
+  table: Table2, send: Send, waypoints: Waypoints, 'link-off': Link2Off, 'arrow-up-right': ArrowUpRight, 'rotate-cw': RotateCw,
+  'circle-x': CircleX,
 };
 
 /** Icons offered in pickers for spaces / templates */

@@ -16,6 +16,8 @@ RUN npm ci --omit=dev --no-audit --no-fund
 
 # ---------- 3) Laufzeit-Image ----------
 FROM node:22-alpine
+# git für den optionalen Git-Export, tzdata damit Sicherungszeiten der Zeitzone (TZ) folgen
+RUN apk add --no-cache git tzdata
 ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data \

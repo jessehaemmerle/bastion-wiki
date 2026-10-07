@@ -10,6 +10,8 @@ import { useChrome, useFetch } from '../lib/hooks.js';
 import { formatBytes, formatDate, PAGE_TYPES, timeAgo } from '../lib/format.js';
 import { buildTree } from '../components/PageTree.jsx';
 import { tr } from '../lib/i18n.js';
+import Variables from '../components/Variables.jsx';
+import { EditorsBanner, References, RunsSection, ShareModal, StartRunModal } from '../components/PageExtras.jsx';
 
 function PropValue({ value }) {
   if (/^https?:\/\/\S+$/.test(value)) return <a href={value} target="_blank" rel="noopener noreferrer">{value}</a>;
@@ -103,6 +105,8 @@ export default function PageView() {
   const { toast, refreshTree, settings } = useApp();
   const { data, error, loading, setData, reload } = useFetch(`/pages/${id}`);
   const [headings, setHeadings] = useState([]);
+  const [varNames, setVarNames] = useState([]);
+  const [vars, setVars] = useState({});
   const [modal, setModal] = useState(null);
   const [copied, copy] = useCopy();
   const uploadRef = useRef(null);
@@ -138,6 +142,7 @@ export default function PageView() {
   }, [page]);
 
   const onHeadings = useCallback((h) => setHeadings(h), []);
+  const onVariables = useCallback((names) => setVarNames((old) => (old.join('|') === names.join('|') ? old : names)), []);
 
   const toggleTask = useCallback(async (index, checked) => {
     if (!page) return;
@@ -167,6 +172,12 @@ export default function PageView() {
   const act = async (fn, msg) => {
     try { await fn(); if (msg) toast(msg); } catch (e) { toast(e.message, 'error'); }
   };
+  const toggleWatch = () => act(async () => {
+    const { watching } = await api.post(`/pages/${page.id}/watch`);
+    setData((d) => ({ page: { ...d.page, watching: { ...d.page.watching, page: watching } } }));
+    toast(watching ? tr('Du wirst über Änderungen benachrichtigt') : tr('Seite wird nicht mehr beobachtet'));
+  });
+  const runnable = ['runbook', 'checklist'].includes(page.pageType);
   const toggleFavorite = () => act(async () => {
     const { isFavorite } = await api.post(`/pages/${page.id}/favorite`);
     setData((d) => ({ page: { ...d.page, isFavorite } }));
@@ -204,7 +215,13 @@ export default function PageView() {
               <Link to={`/s/${page.space.key}`} className="row" style={{ gap: 6 }}><span className="cable" style={{ '--sc': page.space.color }} />{page.space.name}</Link>
             </div>
             <div className="page-toolbar">
+              {canWrite && runnable && <button className="btn sm" onClick={() => setModal('run')}><Icon name="play" size={14} /> {tr('Ausführen')}</button>}
               {canWrite && <Link to={`/p/${page.id}/edit`} className="btn primary sm" title={tr('Bearbeiten (E)')}><Icon name="pen" size={14} /> {tr('Bearbeiten')}</Link>}
+              <button className={`btn sm icon ${page.watching?.page ? 'active' : ''}`} onClick={toggleWatch}
+                title={page.watching?.page ? tr('Nicht mehr beobachten') : page.watching?.space ? tr('Bereich wird beobachtet – Seite zusätzlich beobachten') : tr('Beobachten')}
+                aria-pressed={Boolean(page.watching?.page)} aria-label={tr('Beobachten')}>
+                <Icon name={page.watching?.page || page.watching?.space ? 'bell-ring' : 'bell'} size={15} />
+              </button>
               <button className={`btn sm icon ${page.isFavorite ? 'active' : ''}`} onClick={toggleFavorite} title={page.isFavorite ? tr('Favorit entfernen') : tr('Als Favorit markieren')}>
                 <Icon name="star" size={15} fill={page.isFavorite ? 'currentColor' : 'none'} />
               </button>
@@ -216,6 +233,8 @@ export default function PageView() {
                 {canWrite && <MenuItem icon="copy" onClick={duplicate}>{tr('Duplizieren')}</MenuItem>}
                 {canWrite && <MenuItem icon="move" onClick={() => setModal('move')}>{tr('Verschieben')}</MenuItem>}
                 {canWrite && <MenuItem icon="paperclip" onClick={() => uploadRef.current?.click()}>{tr('Datei anhängen')}</MenuItem>}
+                {canWrite && !runnable && <MenuItem icon="play" onClick={() => setModal('run')}>{tr('Als Durchlauf ausführen')}</MenuItem>}
+                {canWrite && settings.allowSharing !== false && <MenuItem icon="share" onClick={() => setModal('share')}>{tr('Freigabelink …')}</MenuItem>}
                 <div className="menu-sep" />
                 <MenuItem icon="download" href={`/api/pages/${page.id}/export?format=md`}>{tr('Als Markdown exportieren')}</MenuItem>
                 <MenuItem icon="file-code" href={`/api/pages/${page.id}/export?format=html`}>{tr('Als HTML exportieren')}</MenuItem>
@@ -236,6 +255,14 @@ export default function PageView() {
             {page.isPinned && <span><Icon name="pin" size={13} /> {tr('Angepinnt')}</span>}
             {page.reviewDue && !overdue && <span>{tr('Nächstes Review {date}', { date: formatDate(page.reviewDue) })}</span>}
           </div>
+          <EditorsBanner editors={page.editors} />
+          {page.runs?.running > 0 && (
+            <div className="presence-banner run">
+              <Icon name="play" size={16} />
+              <span>{tr('Ein Durchlauf dieser Seite ist gerade offen.')}</span>
+              <Link to={`/p/${page.id}#runs`} onClick={(e) => { e.preventDefault(); document.getElementById('runs')?.scrollIntoView({ behavior: 'smooth' }); }}>{tr('Anzeigen')}</Link>
+            </div>
+          )}
           {page.tags.length > 0 && <div className="page-tags">{page.tags.map((t) => <TagPill key={t.name} name={t.name} color={t.color} />)}</div>}
 
           {overdue && (
@@ -271,7 +298,8 @@ export default function PageView() {
             </section>
           )}
 
-          <ContentView html={page.content} onHeadings={onHeadings} onToggleTask={canWrite ? toggleTask : undefined} />
+          <Variables names={varNames} pageId={page.id} properties={page.properties} value={vars} onChange={setVars} />
+          <ContentView html={page.content} onHeadings={onHeadings} onToggleTask={canWrite ? toggleTask : undefined} onVariables={onVariables} variables={vars} />
           {!page.content?.replace(/<[^>]+>/g, '').trim() && !page.content?.includes('<img') && (
             <div className="faint" style={{ padding: '20px 0' }}>{tr('Diese Seite hat noch keinen Inhalt.')} {canWrite && <Link to={`/p/${page.id}/edit`}>{tr('Seite bearbeiten')}</Link>}</div>
           )}
@@ -310,6 +338,8 @@ export default function PageView() {
               </div>
             </>
           )}
+          <div id="runs"><RunsSection page={page} canWrite={canWrite} onStart={() => setModal('run')} /></div>
+          <References page={page} />
           <input ref={uploadRef} type="file" multiple hidden onChange={(e) => { upload([...e.target.files]); e.target.value = ''; }} />
         </article>
 
@@ -327,6 +357,8 @@ export default function PageView() {
         </aside>
       </div>
 
+      {modal === 'run' && <StartRunModal page={page} onClose={() => setModal(null)} />}
+      {modal === 'share' && <ShareModal page={page} onClose={() => setModal(null)} />}
       {modal === 'move' && <MoveModal page={page} onClose={() => setModal(null)} onMoved={() => { refreshTree(); reload(); }} />}
       {modal === 'delete' && (
         <Confirm

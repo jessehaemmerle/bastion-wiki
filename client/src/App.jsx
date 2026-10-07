@@ -14,6 +14,10 @@ import Tags, { TagDetail } from './pages/Tags.jsx';
 import Review from './pages/Review.jsx';
 import UserSettings from './pages/UserSettings.jsx';
 import NotFound from './pages/NotFound.jsx';
+import Inventory from './pages/Inventory.jsx';
+import RunView from './pages/RunView.jsx';
+import Notifications from './pages/Notifications.jsx';
+import SharedPage from './pages/SharedPage.jsx';
 
 // The editor and admin panel are big – load them on demand
 const PageEdit = lazy(() => import('./pages/PageEdit.jsx'));
@@ -24,6 +28,8 @@ function RequireAuth({ children, role }) {
   const location = useLocation();
   if (user === undefined) return <Spinner center />;
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  // security policy: set up two-factor authentication first
+  if (user.mustEnable2fa && location.pathname !== '/settings/security') return <Navigate to="/settings/security" replace />;
   if (role === 'admin' && user.role !== 'admin') return <Navigate to="/" replace />;
   return children;
 }
@@ -34,6 +40,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Login register />} />
+        <Route path="/share/:token" element={<SharedPage />} />
         <Route path="/admin/*" element={<RequireAuth role="admin"><AdminApp /></RequireAuth>} />
         <Route element={<RequireAuth><Layout /></RequireAuth>}>
           <Route index element={<Dashboard />} />
@@ -47,6 +54,9 @@ export default function App() {
           <Route path="tags" element={<Tags />} />
           <Route path="tags/:name" element={<TagDetail />} />
           <Route path="review" element={<Review />} />
+          <Route path="inventory/:type?" element={<Inventory />} />
+          <Route path="runs/:id" element={<RunView />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="settings/:tab?" element={<UserSettings />} />
           <Route path="*" element={<NotFound />} />
         </Route>

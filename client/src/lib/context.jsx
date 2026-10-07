@@ -17,6 +17,7 @@ export function AppProvider({ children }) {
   const [online, setOnline] = useState(navigator.onLine);
   const [lang, setLangState] = useState(getLanguage());
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [unread, setUnread] = useState(0);
   const toastId = useRef(0);
 
   const toast = useCallback((message, type = 'success') => {
@@ -64,6 +65,20 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (user) loadSpaces();
   }, [user, loadSpaces]);
+
+  // unread notifications: poll while the tab is visible
+  const refreshUnread = useCallback(() => {
+    api.get('/notifications/unread').then((d) => setUnread(d.unread)).catch(() => {});
+  }, []);
+  const loggedIn = Boolean(user) && !user?.mustEnable2fa;
+  useEffect(() => {
+    if (!loggedIn) return undefined;
+    refreshUnread();
+    const t = setInterval(() => { if (document.visibilityState === 'visible') refreshUnread(); }, 60000);
+    const onVis = () => document.visibilityState === 'visible' && refreshUnread();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [loggedIn, refreshUnread]);
 
   // theme
   const themeState = useMemo(() => resolveTheme(settings, user?.preferences || {}), [settings, user]);
@@ -130,7 +145,7 @@ export function AppProvider({ children }) {
   const value = {
     lang, changeLanguage,
     user, setUser, settings, setSettings, loadSettings, spaces, loadSpaces, refreshTree, treeVersion,
-    toast, paletteOpen, setPaletteOpen, themeState, updatePreferences, logout, online,
+    toast, paletteOpen, setPaletteOpen, themeState, updatePreferences, logout, online, unread, setUnread, refreshUnread,
   };
 
   return (

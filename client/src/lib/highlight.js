@@ -34,7 +34,7 @@ export const CODE_LANGUAGES = [
   ['xml', 'XML / HTML'], ['properties', 'Properties'], ['puppet', 'Puppet'], ['routeros', 'RouterOS'], ['nix', 'Nix'],
   ['vim', 'Vimscript'], ['awk', 'AWK'], ['diff', 'Diff'], ['makefile', 'Makefile'], ['perl', 'Perl'], ['ruby', 'Ruby'],
   ['php', 'PHP'], ['rust', 'Rust'], ['java', 'Java'], ['csharp', 'C#'], ['css', 'CSS'], ['markdown', 'Markdown'],
-  ['plaintext', 'Text / Log'],
+  ['plaintext', 'Text / Log'], ['mermaid', 'Mermaid-Diagramm'],
 ];
 
 export { hljs };

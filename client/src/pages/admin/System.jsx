@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from '../../components/Icon.jsx';
 import { api } from '../../lib/api.js';
 import { useApp } from '../../lib/context.jsx';
@@ -9,6 +10,7 @@ const TASKS = [
   ['purge-tags', 'tags', 'Unbenutzte Tags entfernen', 'Löscht Tags, die keiner Seite mehr zugeordnet sind.'],
   ['purge-orphans', 'paperclip', 'Verwaiste Dateien aufräumen', 'Löscht Dateien im Upload-Verzeichnis ohne Datenbankeintrag.'],
   ['prune-revisions', 'git-branch', 'Alte Versionen kürzen', 'Behält pro Seite nur die letzten 50 Versionen.'],
+  ['reindex-links', 'link', 'Link-Index neu aufbauen', 'Liest alle Seiten neu ein für Rückverweise und Link-Prüfung.'],
   ['vacuum', 'database', 'Datenbank optimieren', 'Führt VACUUM ANALYZE aus (kann kurz dauern).'],
 ];
 
@@ -27,7 +29,7 @@ export default function System() {
   return (
     <>
       <div className="page-head">
-        <div><h1>{tr('Wartung & Export')}</h1><p>{tr('Aufräumarbeiten, Datenexport und Hinweise zur Sicherung.')}</p></div>
+        <div><h1>{tr('Wartung')}</h1><p>{tr('Aufräumarbeiten und Datenexport.')}</p></div>
       </div>
       <div className="grid-2">
         <div className="card">
@@ -49,11 +51,12 @@ export default function System() {
             <div><a className="btn primary" href="/api/admin/export"><Icon name="download" /> {tr('Export herunterladen')}</a></div>
           </div>
           <div className="card pad col" style={{ gap: 10 }}>
-            <h3 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>{tr('Backup (empfohlen)')}</h3>
-            <p className="small muted" style={{ margin: 0 }}>{tr('Für vollständige Sicherungen inkl. Benutzern und Versionen die Datenbank sowie das Upload-Volume sichern:')}</p>
+            <h3 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>{tr('Backup')}</h3>
+            <p className="small muted" style={{ margin: 0 }}>{tr('Vollständige Sicherungen mit Wiederherstellung gibt es unter „Sicherung & Export“. Alternativ auf Ebene von Datenbank und Volumes:')} <Link to="/admin/backup">{tr('Zur Sicherung')}</Link></p>
             <pre className="secret-box" style={{ margin: 0, display: 'block', whiteSpace: 'pre-wrap' }}>{`docker compose exec -T db pg_dump -U bastion -Fc bastion > bastion-$(date +%F).dump
 docker run --rm -v bastion_uploads:/data -v "$PWD":/backup alpine \\
-  tar czf /backup/uploads-$(date +%F).tgz -C /data .`}</pre>
+  tar czf /backup/uploads-$(date +%F).tgz -C /data .
+# ${tr('dazu gehört der Schlüssel für Geheimnisse:')} /data/secret.key ${tr('bzw.')} SECRET_KEY`}</pre>
           </div>
         </div>
       </div>

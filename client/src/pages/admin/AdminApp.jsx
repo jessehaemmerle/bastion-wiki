@@ -12,13 +12,18 @@ import Branding from './Branding.jsx';
 import Audit from './Audit.jsx';
 import System from './System.jsx';
 import Import from './Import.jsx';
+import Auth from './Auth.jsx';
+import Notify from './Notify.jsx';
+import Backup from './Backup.jsx';
+import Links from './Links.jsx';
+import Shares from './Shares.jsx';
 import { tr } from '../../lib/i18n.js';
 
 const NAV = [
   ['Übersicht', [['', 'gauge', 'Systemstatus']]],
-  ['Zugriff', [['users', 'users', 'Benutzer'], ['groups', 'user-cog', 'Gruppen'], ['spaces', 'shield', 'Bereiche & Rechte']]],
-  ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['tags', 'tags', 'Tags'], ['import', 'download', 'Import']]],
-  ['System', [['branding', 'palette', 'Branding & Theming'], ['audit', 'scroll', 'Audit-Log'], ['system', 'server-cog', 'Wartung & Export']]],
+  ['Zugriff', [['users', 'users', 'Benutzer'], ['groups', 'user-cog', 'Gruppen'], ['spaces', 'shield', 'Bereiche & Rechte'], ['auth', 'fingerprint', 'Anmeldung & Sicherheit']]],
+  ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['tags', 'tags', 'Tags'], ['links', 'unlink', 'Link-Prüfung'], ['shares', 'share', 'Freigabelinks'], ['import', 'download', 'Import']]],
+  ['System', [['branding', 'palette', 'Branding & Theming'], ['notify', 'bell', 'Benachrichtigungen'], ['backup', 'archive', 'Sicherung & Export'], ['audit', 'scroll', 'Audit-Log'], ['system', 'server-cog', 'Wartung']]],
 ];
 
 export default function AdminApp() {
@@ -67,6 +72,11 @@ export default function AdminApp() {
             <Route path="audit" element={<Audit />} />
             <Route path="system" element={<System />} />
             <Route path="import" element={<Import />} />
+            <Route path="auth" element={<Auth />} />
+            <Route path="notify" element={<Notify />} />
+            <Route path="backup" element={<Backup />} />
+            <Route path="links" element={<Links />} />
+            <Route path="shares" element={<Shares />} />
           </Routes>
         </main>
       </div>

@@ -22,9 +22,9 @@ const TEMPLATES = {
       content: `<h2>Zweck</h2><p>Wofür ist dieses Runbook und wann wird es ausgeführt?</p>
 ${callout('warning', '<p><strong>Voraussetzungen:</strong> Zugriff auf … / Wartungsfenster angekündigt / Backup vorhanden.</p>')}
 <h2>Schritte</h2><ol><li><p>Verbindung zum Host herstellen</p></li></ol>
-${code('bash', 'ssh admin@host.example.com')}
+${code('bash', 'ssh admin@{{Host}}')}
 <ol start="2"><li><p>Status prüfen</p></li></ol>
-${code('bash', 'systemctl status mein-dienst')}
+${code('bash', 'systemctl status {{Service}}')}
 <h2>Verifikation</h2>${tasks(task('Dienst läuft'), task('Monitoring ist grün'), task('Ticket aktualisiert'))}
 <h2>Rollback</h2><p>Was tun, wenn etwas schiefgeht?</p>`,
     },
@@ -48,8 +48,8 @@ ${code('bash', 'systemctl status mein-dienst')}
 <h2>Hardware / VM</h2>${table(['Komponente', 'Wert'], ['CPU', '4 vCPU'], ['RAM', '16 GB'], ['Disk', '100 GB SSD'])}
 <h2>Netzwerk</h2>${table(['Interface', 'IP', 'VLAN'], ['eth0', '10.0.10.21/24', '10'])}
 <h2>Dienste</h2>${table(['Dienst', 'Port', 'Hinweis'], ['nginx', '443/tcp', 'Reverse Proxy'], ['node_exporter', '9100/tcp', 'Monitoring'])}
-<h2>Zugang</h2>${callout('danger', '<p>Zugangsdaten gehören in den Passwort-Manager – <strong>niemals</strong> ins Wiki.</p>')}
-${code('bash', 'ssh -J bastion.example.com admin@srv-app-01')}
+<h2>Zugang</h2>${callout('info', '<p>Passwörter und Schlüssel als <strong>Geheimnis-Block</strong> ablegen (<code>/</code> → Geheimnis): verschlüsselt, nicht durchsuchbar, Anzeigen wird protokolliert.</p>')}
+${code('bash', 'ssh -J bastion.example.com admin@{{Hostname}}')}
 <h2>Backup</h2><p>Was wird wie oft wohin gesichert?</p>`,
     },
     {
@@ -94,9 +94,9 @@ ${code('bash', 'ssh -J bastion.example.com admin@srv-app-01')}
       content: `<h2>Purpose</h2><p>What is this runbook for and when is it run?</p>
 ${callout('warning', '<p><strong>Prerequisites:</strong> access to … / maintenance window announced / backup available.</p>')}
 <h2>Steps</h2><ol><li><p>Connect to the host</p></li></ol>
-${code('bash', 'ssh admin@host.example.com')}
+${code('bash', 'ssh admin@{{Host}}')}
 <ol start="2"><li><p>Check the status</p></li></ol>
-${code('bash', 'systemctl status my-service')}
+${code('bash', 'systemctl status {{Service}}')}
 <h2>Verification</h2>${tasks(task('Service is running'), task('Monitoring is green'), task('Ticket updated'))}
 <h2>Rollback</h2><p>What to do if something goes wrong?</p>`,
     },
@@ -120,8 +120,8 @@ ${code('bash', 'systemctl status my-service')}
 <h2>Hardware / VM</h2>${table(['Component', 'Value'], ['CPU', '4 vCPU'], ['RAM', '16 GB'], ['Disk', '100 GB SSD'])}
 <h2>Network</h2>${table(['Interface', 'IP', 'VLAN'], ['eth0', '10.0.10.21/24', '10'])}
 <h2>Services</h2>${table(['Service', 'Port', 'Note'], ['nginx', '443/tcp', 'Reverse proxy'], ['node_exporter', '9100/tcp', 'Monitoring'])}
-<h2>Access</h2>${callout('danger', '<p>Credentials belong in the password manager – <strong>never</strong> in the wiki.</p>')}
-${code('bash', 'ssh -J bastion.example.com admin@srv-app-01')}
+<h2>Access</h2>${callout('info', '<p>Store passwords and keys as a <strong>secret block</strong> (<code>/</code> → Secret): encrypted, not searchable, every reveal is logged.</p>')}
+${code('bash', 'ssh -J bastion.example.com admin@{{Hostname}}')}
 <h2>Backup</h2><p>What is backed up, how often and where to?</p>`,
     },
     {

@@ -1,5 +1,5 @@
 /* Bastion service worker – app shell caching + offline reading of visited pages */
-const VERSION = 'bastion-v1';
+const VERSION = 'bastion-v2';
 const SHELL = `${VERSION}-shell`;
 const ASSETS = `${VERSION}-assets`;
 const API = `${VERSION}-api`;

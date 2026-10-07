@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import { ModeSwitch, ThemeGrid } from '../components/ThemePicker.jsx';
-import { Avatar, ColorPicker, Confirm, Modal, Spinner, useCopy } from '../components/ui.jsx';
+import { Avatar, ColorPicker, Confirm, Modal, Spinner, Switch, useCopy } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { useChrome, useFetch } from '../lib/hooks.js';
@@ -47,15 +47,24 @@ function Profile() {
         </div>
         <div><button className="btn primary"><Icon name="save" /> {tr('Speichern')}</button></div>
       </form>
-      <form className="card pad col" style={{ gap: 14 }} onSubmit={savePw}>
-        <h3 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>{tr('Passwort ändern')}</h3>
-        <div className="form-grid">
-          <div className="field"><label>{tr('Aktuelles Passwort')}</label><input type="password" className="input" autoComplete="current-password" value={pw.currentPassword} onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} required /></div>
-          <div className="field"><label>{tr('Neues Passwort')}</label><input type="password" className="input" autoComplete="new-password" minLength={8} value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} required /></div>
-          <div className="field"><label>{tr('Wiederholen')}</label><input type="password" className="input" autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} required /></div>
+      {user.authSource === 'local' ? (
+        <form className="card pad col" style={{ gap: 14 }} onSubmit={savePw}>
+          <h3 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>{tr('Passwort ändern')}</h3>
+          <div className="form-grid">
+            <div className="field"><label>{tr('Aktuelles Passwort')}</label><input type="password" className="input" autoComplete="current-password" value={pw.currentPassword} onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} required /></div>
+            <div className="field"><label>{tr('Neues Passwort')}</label><input type="password" className="input" autoComplete="new-password" minLength={8} value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} required /></div>
+            <div className="field"><label>{tr('Wiederholen')}</label><input type="password" className="input" autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} required /></div>
+          </div>
+          <div><button className="btn"><Icon name="key-round" /> {tr('Passwort ändern')}</button></div>
+        </form>
+      ) : (
+        <div className="card pad row" style={{ gap: 12 }}>
+          <Icon name="key-round" size={18} />
+          <div className="small">{user.authSource === 'ldap'
+            ? tr('Dein Konto kommt aus dem Verzeichnisdienst (Active Directory / LDAP). Das Passwort änderst du dort.')
+            : tr('Du meldest dich per Single Sign-on an. Passwort und Zwei-Faktor-Anmeldung verwaltet dein Identitätsanbieter.')}</div>
         </div>
-        <div><button className="btn"><Icon name="key-round" /> {tr('Passwort ändern')}</button></div>
-      </form>
+      )}
     </div>
   );
 }
@@ -222,9 +231,179 @@ function Sessions() {
   );
 }
 
+function RecoveryCodes({ codes, onDone }) {
+  const [copied, copy] = useCopy();
+  const text = codes.join('\n');
+  const download = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([`${tr('Wiederherstellungscodes')} – ${location.host}\n\n${text}\n`], { type: 'text/plain' }));
+    a.download = 'bastion-recovery-codes.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  return (
+    <Modal title={tr('Wiederherstellungscodes')} icon="key-round" onClose={onDone}
+      footer={<button className="btn primary" onClick={onDone}>{tr('Ich habe die Codes gesichert')}</button>}>
+      <p className="muted" style={{ marginTop: 0 }}>{tr('Mit diesen Codes kommst du ins Konto, wenn das Telefon fehlt. Jeder Code funktioniert einmal. Bewahre sie getrennt vom Telefon auf, z. B. im Passwort-Manager.')}</p>
+      <div className="recovery-grid mono">{codes.map((c) => <span key={c}>{c}</span>)}</div>
+      <div className="row" style={{ gap: 8, marginTop: 12 }}>
+        <button className="btn sm" onClick={() => copy(text)}><Icon name={copied ? 'check' : 'copy'} size={14} /> {tr('Kopieren')}</button>
+        <button className="btn sm" onClick={download}><Icon name="download" size={14} /> {tr('Als Textdatei')}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function Security() {
+  const { user, setUser, toast } = useApp();
+  const [setup, setSetup] = useState(null);
+  const [code, setCode] = useState('');
+  const [codes, setCodes] = useState(null);
+  const [action, setAction] = useState(null); // 'disable' | 'renew'
+  const [busy, setBusy] = useState(false);
+  const refreshMe = async () => { const { user: u } = await api.get('/me'); setUser(u); };
+
+  const start = async () => {
+    try { setSetup(await api.post('/me/totp/setup')); setCode(''); } catch (e) { toast(e.message, 'error'); }
+  };
+  const enable = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { recoveryCodes } = await api.post('/me/totp/enable', { code });
+      setSetup(null);
+      setCodes(recoveryCodes);
+      toast(tr('Zwei-Faktor-Anmeldung aktiviert'));
+    } catch (err) { toast(err.message, 'error'); }
+    setBusy(false);
+  };
+  const confirmAction = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      if (action === 'disable') {
+        await api.post('/me/totp/disable', { code });
+        toast(tr('Zwei-Faktor-Anmeldung deaktiviert'));
+        await refreshMe();
+      } else {
+        const { recoveryCodes } = await api.post('/me/totp/recovery', { code });
+        setCodes(recoveryCodes);
+      }
+      setAction(null);
+      setCode('');
+    } catch (err) { toast(err.message, 'error'); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="col" style={{ gap: 18 }}>
+      {user.mustEnable2fa && (
+        <div className="review-banner" role="alert">
+          <Icon name="shield-alert" size={18} />
+          <div className="grow"><strong>{tr('Zwei-Faktor-Anmeldung ist vorgeschrieben.')}</strong> {tr('Richte sie ein, um das Wiki weiter zu nutzen.')}</div>
+        </div>
+      )}
+      <div className="card pad col" style={{ gap: 14 }}>
+        <div className="row between wrap">
+          <div>
+            <h3 style={{ margin: 0 }}>{tr('Zwei-Faktor-Anmeldung')}</h3>
+            <div className="small faint">{tr('Zusätzlich zum Passwort ein Code aus einer Authenticator-App (TOTP), z. B. Aegis, 2FAS, Google oder Microsoft Authenticator.')}</div>
+          </div>
+          {user.authSource !== 'oidc' && (user.totpEnabled
+            ? <span className="tape lg">{tr('Aktiv')}</span>
+            : <span className="badge warning">{tr('Nicht eingerichtet')}</span>)}
+        </div>
+        {user.authSource === 'oidc' && <div className="small muted">{tr('Du meldest dich per Single Sign-on an. Passwort und Zwei-Faktor-Anmeldung verwaltet dein Identitätsanbieter.')}</div>}
+        {user.authSource !== 'oidc' && !user.totpEnabled && !setup && (
+          <div><button className="btn primary" onClick={start}><Icon name="smartphone" /> {tr('Einrichten')}</button></div>
+        )}
+        {setup && (
+          <form className="totp-setup" onSubmit={enable}>
+            <img src={setup.qr} alt={tr('QR-Code für die Authenticator-App')} width={180} height={180} />
+            <div className="col" style={{ gap: 12 }}>
+              <ol className="small steps">
+                <li>{tr('QR-Code mit der Authenticator-App scannen.')}</li>
+                <li>{tr('Oder den Schlüssel von Hand eingeben:')} <code className="mono break">{setup.secret.match(/.{1,4}/g).join(' ')}</code></li>
+                <li>{tr('Den angezeigten 6-stelligen Code eingeben.')}</li>
+              </ol>
+              <div className="row" style={{ gap: 8 }}>
+                <input className="input mono" style={{ maxWidth: 140 }} inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="123456"
+                  aria-label={tr('Bestätigungscode')} value={code} onChange={(e) => setCode(e.target.value)} autoFocus required />
+                <button className="btn primary" disabled={busy}>{busy && <span className="spinner" />} {tr('Aktivieren')}</button>
+                <button type="button" className="btn ghost" onClick={() => setSetup(null)}>{tr('Abbrechen')}</button>
+              </div>
+            </div>
+          </form>
+        )}
+        {user.totpEnabled && !action && (
+          <div className="row wrap" style={{ gap: 8 }}>
+            <button className="btn" onClick={() => setAction('renew')}><Icon name="refresh" size={15} /> {tr('Neue Wiederherstellungscodes')}</button>
+            <button className="btn danger" onClick={() => setAction('disable')}><Icon name="x" size={15} /> {tr('Deaktivieren')}</button>
+          </div>
+        )}
+        {action && (
+          <form className="row wrap" style={{ gap: 8 }} onSubmit={confirmAction}>
+            <input className="input mono" style={{ maxWidth: 200 }} autoComplete="one-time-code" placeholder={tr('Code oder Wiederherstellungscode')}
+              aria-label={tr('Bestätigungscode')} value={code} onChange={(e) => setCode(e.target.value)} autoFocus required />
+            <button className={`btn ${action === 'disable' ? 'danger' : 'primary'}`} disabled={busy}>{action === 'disable' ? tr('Deaktivieren') : tr('Codes erzeugen')}</button>
+            <button type="button" className="btn ghost" onClick={() => { setAction(null); setCode(''); }}>{tr('Abbrechen')}</button>
+          </form>
+        )}
+      </div>
+      {codes && <RecoveryCodes codes={codes} onDone={async () => { setCodes(null); await refreshMe(); }} />}
+    </div>
+  );
+}
+
+function NotificationSettings() {
+  const { user, updatePreferences, toast } = useApp();
+  const { data, reload } = useFetch('/me/watches');
+  const prefs = user.preferences || {};
+  const unwatch = async (w) => {
+    try {
+      await api.post(w.pageId ? `/pages/${w.pageId}/watch` : `/spaces/${w.spaceId}/watch`);
+      reload();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+  return (
+    <div className="col" style={{ gap: 18 }}>
+      <div className="card pad col" style={{ gap: 16 }}>
+        <h3 style={{ margin: 0 }}>{tr('Benachrichtigungen')}</h3>
+        <Switch checked={prefs.emailNotifications !== false} onChange={(v) => updatePreferences({ emailNotifications: v })}
+          label={user.email ? tr('Zusätzlich per E-Mail an {email} (gebündelt)', { email: user.email }) : tr('Per E-Mail (dafür im Profil eine Adresse hinterlegen)')} />
+        <Switch checked={prefs.autoWatch !== false} onChange={(v) => updatePreferences({ autoWatch: v })}
+          label={tr('Seiten automatisch beobachten, die ich anlege oder bearbeite')} />
+        <div className="small faint">{tr('Beobachtete Seiten und Bereiche melden Änderungen, Löschungen und fällige Reviews. Beobachten lässt sich jede Seite über das Glocken-Symbol.')}</div>
+      </div>
+      <div className="card">
+        <div className="card-header"><h3>{tr('Beobachtet')}</h3></div>
+        {!data ? <Spinner /> : (
+          <ul className="list">
+            {!data.watches.length && <li className="list-item faint small">{tr('Du beobachtest noch nichts.')}</li>}
+            {data.watches.map((w) => (
+              <li key={`${w.pageId}-${w.spaceId}`} className="list-item">
+                <span className="cable" style={{ '--sc': w.spaceColor }} />
+                <div className="grow" style={{ minWidth: 0 }}>
+                  {w.pageId
+                    ? <Link to={`/p/${w.pageId}`} className="li-title">{w.title}</Link>
+                    : <Link to={`/s/${w.spaceKey}`} className="li-title">{tr('Bereich {name}', { name: w.spaceName })}</Link>}
+                  {w.pageId && <div className="li-meta">{w.spaceName}</div>}
+                </div>
+                <button className="btn ghost sm" onClick={() => unwatch(w)}><Icon name="bell-off" size={14} /> {tr('Nicht mehr beobachten')}</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const TABS = [
   ['profile', 'user', 'Profil'],
   ['appearance', 'palette', 'Darstellung'],
+  ['security', 'shield-check', 'Sicherheit'],
+  ['notifications', 'bell', 'Benachrichtigungen'],
   ['tokens', 'key-round', 'API-Tokens'],
   ['sessions', 'laptop', 'Sitzungen'],
 ];
@@ -244,6 +423,8 @@ export default function UserSettings() {
       </div>
       {tab === 'profile' && <Profile />}
       {tab === 'appearance' && <Appearance />}
+      {tab === 'security' && <Security />}
+      {tab === 'notifications' && <NotificationSettings />}
       {tab === 'tokens' && <Tokens />}
       {tab === 'sessions' && <Sessions />}
     </div>
