@@ -19,6 +19,8 @@ import tagRoutes from './routes/tags.js';
 import attachmentRoutes from './routes/attachments.js';
 import templateRoutes from './routes/templates.js';
 import adminRoutes from './routes/admin.js';
+import importRoutes from './routes/imports.js';
+import { recoverJobs } from './importers/jobs.js';
 
 const app = express();
 app.set('trust proxy', config.trustProxy);
@@ -67,6 +69,7 @@ api.use(searchRoutes);
 api.use(tagRoutes);
 api.use(attachmentRoutes);
 api.use(templateRoutes);
+api.use(importRoutes);
 api.use(adminRoutes);
 api.use((_req, _res, next) => next(new HttpError(404, 'API-Endpunkt nicht gefunden')));
 api.use((err, req, res, _next) => {
@@ -135,6 +138,7 @@ if (fs.existsSync(config.publicDir)) {
 async function main() {
   await migrate();
   await bootstrap();
+  await recoverJobs();
   const server = app.listen(config.port, () => console.log(`[web] Bastion läuft auf http://0.0.0.0:${config.port}`));
   const shutdown = () => {
     console.log('[web] shutting down');

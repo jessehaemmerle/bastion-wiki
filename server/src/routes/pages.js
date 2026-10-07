@@ -27,7 +27,7 @@ const pageSchema = {
   baseVersion: { type: 'int' },
 };
 
-function cleanProperties(props) {
+export function cleanProperties(props) {
   const out = {};
   for (const [k, v] of Object.entries(props || {}).slice(0, 50)) {
     const key = String(k).trim().slice(0, 60);
@@ -43,7 +43,7 @@ export function normalizeTags(tags) {
     .filter((t) => /^[\p{L}\p{N}][\p{L}\p{N}._/+-]*$/u.test(t)))].slice(0, 30);
 }
 
-async function setTags(c, pageId, tags) {
+export async function setTags(c, pageId, tags) {
   await c.query('DELETE FROM page_tags WHERE page_id=$1', [pageId]);
   for (const name of normalizeTags(tags)) {
     const { rows } = await c.query(
@@ -54,7 +54,7 @@ async function setTags(c, pageId, tags) {
   }
 }
 
-async function uniqueSlug(c, spaceId, title, excludeId = 0) {
+export async function uniqueSlug(c, spaceId, title, excludeId = 0) {
   const base = slugify(title);
   let slug = base;
   for (let i = 2; ; i++) {

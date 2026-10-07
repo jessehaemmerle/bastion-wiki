@@ -11,11 +11,12 @@ import AdminTags from './AdminTags.jsx';
 import Branding from './Branding.jsx';
 import Audit from './Audit.jsx';
 import System from './System.jsx';
+import Import from './Import.jsx';
 
 const NAV = [
   ['Übersicht', [['', 'gauge', 'Systemstatus']]],
   ['Zugriff', [['users', 'users', 'Benutzer'], ['groups', 'user-cog', 'Gruppen'], ['spaces', 'shield', 'Bereiche & Rechte']]],
-  ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['tags', 'tags', 'Tags']]],
+  ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['tags', 'tags', 'Tags'], ['import', 'download', 'Import']]],
   ['System', [['branding', 'palette', 'Branding & Theming'], ['audit', 'scroll', 'Audit-Log'], ['system', 'server-cog', 'Wartung & Export']]],
 ];
 
@@ -64,6 +65,7 @@ export default function AdminApp() {
             <Route path="branding" element={<Branding />} />
             <Route path="audit" element={<Audit />} />
             <Route path="system" element={<System />} />
+            <Route path="import" element={<Import />} />
           </Routes>
         </main>
       </div>
