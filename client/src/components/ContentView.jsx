@@ -254,8 +254,11 @@ export default function ContentView({ html, onHeadings, onToggleTask, onVariable
       wrap.append(t);
     });
 
-    // task items
-    root.querySelectorAll('ul[data-type="taskList"] > li').forEach((li, index) => {
+    // task items (indices count only the page's own items – snippet content is not part of page.content)
+    let taskIndex = 0;
+    root.querySelectorAll('ul[data-type="taskList"] > li').forEach((li) => {
+      const inSnippet = Boolean(li.closest('.snippet-content'));
+      const index = inSnippet ? -1 : taskIndex++;
       let input = li.querySelector(':scope > label input[type="checkbox"]');
       if (!input) {
         const label = document.createElement('label');
@@ -267,7 +270,7 @@ export default function ContentView({ html, onHeadings, onToggleTask, onVariable
         li.append(label, div);
       }
       input.checked = li.dataset.checked === 'true';
-      input.disabled = !toggleRef.current;
+      input.disabled = inSnippet || !toggleRef.current;
       input.addEventListener('change', () => {
         li.dataset.checked = String(input.checked);
         toggleRef.current?.(index, input.checked);

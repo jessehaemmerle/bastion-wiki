@@ -19,14 +19,19 @@ export default function Search() {
   useChrome([{ label: tr('Suche') }]);
 
   useEffect(() => {
+    let cancelled = false;
     const t = setTimeout(async () => {
       setParams(Object.fromEntries(Object.entries({ q, space, type }).filter(([, v]) => v)), { replace: true });
-      if (!q.trim() && !space && !type) { setRes(null); return; }
+      if (!q.trim() && !space && !type) { setRes(null); setLoading(false); return; }
       setLoading(true);
-      try { setRes(await api.get(`/search${qs({ q, space, type, limit: 50 })}`)); } catch { setRes(null); }
+      let r = null;
+      try { r = await api.get(`/search${qs({ q, space, type, limit: 50 })}`); } catch { /* shown as no result */ }
+      // a newer query has started meanwhile – don't overwrite its results with stale ones
+      if (cancelled) return;
+      setRes(r);
       setLoading(false);
     }, 220);
-    return () => clearTimeout(t);
+    return () => { cancelled = true; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, space, type]);
 
@@ -53,7 +58,7 @@ export default function Search() {
           <option value="">{tr('Alle Typen')}</option>
           {Object.entries(PAGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        {res && <span className="faint small" style={{ alignSelf: 'center', marginLeft: 'auto' }}>{tr('{n} Treffer in {ms} ms', { n: res.total, ms: res.tookMs })}</span>}
+        {res && <span className="faint small" style={{ alignSelf: 'center', marginLeft: 'auto' }}>{tr('{n} Treffer in {ms} ms', { n: res.total, ms: res.tookMs ?? 0 })}</span>}
         {loading && <Spinner />}
       </div>
 
@@ -76,7 +81,7 @@ export default function Search() {
         <Link key={p.id} to={`/p/${p.id}`} className="result">
           <div className="row small faint">
             <PageIcon icon={p.icon} fallback={PAGE_TYPES[p.pageType]?.icon} size={14} />
-            <span className="cable" style={{ '--sc': p.spaceColor }} /><span>{p.spaceName}</span>{p.pageType !== 'doc' && <span className="tape">{PAGE_TYPES[p.pageType]?.label}</span>}<span>geändert {timeAgo(p.updatedAt)}</span>
+            <span className="cable" style={{ '--sc': p.spaceColor }} /><span>{p.spaceName}</span>{p.pageType !== 'doc' && <span className="tape">{PAGE_TYPES[p.pageType]?.label}</span>}<span>{tr('geändert {when}', { when: timeAgo(p.updatedAt) })}</span>
           </div>
           <h4>{p.title}</h4>
           {p.snippet && <Snippet text={p.snippet} className="small muted" />}

@@ -83,7 +83,7 @@ function UserModal({ user, groups, onClose, onSaved }) {
 export default function Users() {
   const { toast, user: me } = useApp();
   const [q, setQ] = useState('');
-  const { data, loading, reload } = useFetch(`/admin/users${qs({ q })}`);
+  const { data, error, loading, reload } = useFetch(`/admin/users${qs({ q })}`);
   const groups = useFetch('/admin/groups');
   const [edit, setEdit] = useState(null);
   const [del, setDel] = useState(null);
@@ -98,7 +98,7 @@ export default function Users() {
           <div className="input-icon" style={{ maxWidth: 320, width: '100%' }}><Icon name="search" /><input className="input sm" placeholder={tr('Suchen …')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <span className="faint small">{tr('{n} Benutzer', { n: data?.users.length ?? 0 })}</span>
         </div>
-        {loading && !data ? <Spinner /> : (
+        {loading && !data ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : (
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>{tr('Benutzer')}</th><th>{tr('Rolle')}</th><th>{tr('Gruppen')}</th><th>{tr('Status')}</th><th>{tr('Letzter Login')}</th><th>{tr('Edits')}</th><th /></tr></thead>
@@ -120,7 +120,7 @@ export default function Users() {
                     <td className="actions">
                       <Dropdown trigger={({ toggle }) => <button className="btn ghost icon sm" onClick={toggle} aria-label={tr('Aktionen')}><Icon name="more" size={15} /></button>}>
                         <MenuItem icon="edit" onClick={() => setEdit(u)}>{tr('Bearbeiten')}</MenuItem>
-                        <MenuItem icon="log-out" onClick={async () => { await api.del(`/admin/users/${u.id}/sessions`); toast(tr('Alle Sitzungen beendet')); }}>{tr('Abmelden erzwingen')}</MenuItem>
+                        <MenuItem icon="log-out" onClick={async () => { try { await api.del(`/admin/users/${u.id}/sessions`); toast(tr('Alle Sitzungen beendet')); } catch (e) { toast(e.message, 'error'); } }}>{tr('Abmelden erzwingen')}</MenuItem>
                         {u.totpEnabled && <MenuItem icon="smartphone" onClick={async () => {
                           if (!confirm(tr('Zwei-Faktor-Anmeldung für {name} zurücksetzen? Die Person kann sich danach nur mit Passwort anmelden und muss 2FA neu einrichten.', { name: u.displayName }))) return;
                           try { await api.patch(`/admin/users/${u.id}`, { reset2fa: true }); toast(tr('2FA zurückgesetzt')); reload(); } catch (e) { toast(e.message, 'error'); }

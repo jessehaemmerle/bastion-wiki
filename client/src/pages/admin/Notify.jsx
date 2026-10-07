@@ -5,7 +5,7 @@ import { api } from '../../lib/api.js';
 import { useApp } from '../../lib/context.jsx';
 import { useFetch } from '../../lib/hooks.js';
 import { timeAgo } from '../../lib/format.js';
-import { tr } from '../../lib/i18n.js';
+import { tr, trServer } from '../../lib/i18n.js';
 import { Field, SaveBar, TestResult, useIntegrations } from './integrationForm.jsx';
 
 const KINDS = {
@@ -45,7 +45,7 @@ function Smtp({ sec }) {
   const test = async () => {
     setBusy(true);
     try {
-      if (sec.dirty) await sec.save();
+      if (sec.dirty && !(await sec.save())) { setBusy(false); return; }
       const { result: r } = await api.post('/admin/integrations/smtp/test', { to });
       setResult(r);
     } catch (e) { setResult({ ok: false, error: e.message }); }
@@ -60,7 +60,7 @@ function Smtp({ sec }) {
           <input className="input" style={{ maxWidth: 240 }} type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="admin@example.org" aria-label={tr('Empfänger der Testmail')} />
           <button className="btn" onClick={test} disabled={busy || !to}>{busy ? <span className="spinner" /> : <Icon name="send" size={15} />} {tr('Testmail senden')}</button>
         </SaveBar>
-        {result && <TestResult result={{ ok: result.ok, children: result.ok ? tr('Testmail an {to} verschickt.', { to }) : result.error }} />}
+        {result && <TestResult result={{ ok: result.ok, children: result.ok ? tr('Testmail an {to} verschickt.', { to }) : trServer(result.error) }} />}
       </div>
     </section>
   );
@@ -161,13 +161,14 @@ function Webhooks() {
       </div>
       {edit && <HookModal hook={edit === 'new' ? null : edit} events={data?.events || []} onClose={() => setEdit(null)} onSaved={reload} />}
       {del && <Confirm danger title={tr('Webhook löschen?')} message={del.name} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
-        onConfirm={async () => { await api.del(`/admin/ops/webhooks/${del.id}`); reload(); }} />}
+        onConfirm={async () => { try { await api.del(`/admin/ops/webhooks/${del.id}`); reload(); } catch (e) { toast(e.message, 'error'); } }} />}
     </section>
   );
 }
 
 export default function Notify() {
-  const { data, section } = useIntegrations();
+  const { data, error, section } = useIntegrations();
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   if (!data) return <Spinner center />;
   return (
     <>

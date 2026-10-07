@@ -27,13 +27,13 @@ function RestoreModal({ source, onClose }) {
         fd.append('confirm', 'RESTORE');
         fd.append('file', source.file);
         const r = await fetch('/api/admin/ops/restore', { method: 'POST', body: fd, credentials: 'same-origin' });
-        res = await r.json();
-        if (!r.ok) throw new Error(res.error);
+        res = r.headers.get('content-type')?.includes('json') ? await r.json() : {};
+        if (!r.ok) throw new Error(res.error ? trServer(res.error) : tr('Fehler {n}', { n: r.status }));
       } else {
         res = await api.post('/admin/ops/restore', { name: source.name, confirm: 'RESTORE' });
       }
       alert([tr('Wiederherstellung abgeschlossen. Alle Sitzungen wurden beendet – bitte neu anmelden.'),
-        tr('Der vorherige Stand liegt als Sicherung „{name}“ bereit.', { name: res.safetyBackup }), ...(res.warnings || [])].join('\n\n'));
+        tr('Der vorherige Stand liegt als Sicherung „{name}“ bereit.', { name: res.safetyBackup }), ...(res.warnings || []).map(trServer)].join('\n\n'));
       setUser(null);
       location.href = '/login';
     } catch (e) {
@@ -121,7 +121,7 @@ function Backups({ sec }) {
       </div>
       {restore && <RestoreModal source={restore} onClose={() => setRestore(null)} />}
       {del && <Confirm danger title={tr('Sicherung löschen?')} message={del.name} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
-        onConfirm={async () => { await api.del(`/admin/ops/backups/${encodeURIComponent(del.name)}`); reload(); }} />}
+        onConfirm={async () => { try { await api.del(`/admin/ops/backups/${encodeURIComponent(del.name)}`); reload(); } catch (e) { toast(e.message, 'error'); } }} />}
     </section>
   );
 }
@@ -166,7 +166,7 @@ function Git({ sec }) {
           <dl className="kv small">
             <dt>{tr('Letzter Lauf')}</dt><dd>{st.lastRun ? formatDate(st.lastRun, true) : '—'}</dd>
             <dt>{tr('Letzter Erfolg')}</dt><dd>{st.lastOk ? formatDate(st.lastOk, true) : '—'}{st.lastCommit && <span className="mono"> · {st.lastCommit}</span>}</dd>
-            {st.lastError && <><dt>{tr('Fehler')}</dt><dd className="mono" style={{ color: 'var(--danger)' }}>{st.lastError}</dd></>}
+            {st.lastError && <><dt>{tr('Fehler')}</dt><dd className="mono" style={{ color: 'var(--danger)' }}>{trServer(st.lastError)}</dd></>}
           </dl>
         )}
       </div>
@@ -201,7 +201,8 @@ function KeyAndMetrics({ meta }) {
 }
 
 export default function Backup() {
-  const { data, section } = useIntegrations();
+  const { data, error, section } = useIntegrations();
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   if (!data) return <Spinner center />;
   return (
     <>

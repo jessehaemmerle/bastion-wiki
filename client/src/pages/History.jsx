@@ -108,7 +108,7 @@ export default function History() {
               {stats && mode === 'diff' && <span className="mono small"><span style={{ color: 'var(--success)' }}>+{stats.add}</span> <span style={{ color: 'var(--danger)' }}>−{stats.del}</span></span>}
             </div>
             {canWrite && selected !== page.version && (
-              <button className="btn sm" onClick={() => setRestore(selected)}><Icon name="undo" size={14} /> v{selected} wiederherstellen</button>
+              <button className="btn sm" onClick={() => setRestore(selected)}><Icon name="undo" size={14} /> {tr('v{n} wiederherstellen', { n: selected })}</button>
             )}
           </div>
           <div className="card-body">
@@ -133,8 +133,9 @@ export default function History() {
           onClose={() => setRestore(null)}
           onConfirm={async () => {
             try {
-              await api.post(`/pages/${id}/revisions/${restore}/restore`);
-              toast(tr('Version {n} wiederhergestellt', { n: restore }));
+              const res = await api.post(`/pages/${id}/revisions/${restore}/restore`);
+              // pages with approval workflow: the restore becomes a change request (202 { pending: true })
+              toast(res?.pending ? tr('Änderungsvorschlag eingereicht – wartet auf Freigabe') : tr('Version {n} wiederhergestellt', { n: restore }));
               refreshTree();
               navigate(`/p/${id}`);
             } catch (e) { toast(e.message, 'error'); }

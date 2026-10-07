@@ -88,10 +88,12 @@ function SchemaModal({ schema, onClose, onSaved }) {
 }
 
 export default function Schemas() {
-  const { data, loading, reload } = useFetch('/schemas');
+  const { toast } = useApp();
+  const { data, error, loading, reload } = useFetch('/schemas');
   const [edit, setEdit] = useState(null);
   const [del, setDel] = useState(null);
   if (loading && !data) return <Spinner center />;
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   return (
     <>
       <div className="page-head">
@@ -129,7 +131,7 @@ export default function Schemas() {
       {del && (
         <Confirm danger title={tr('Schema löschen?')} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
           message={del.pages ? trn(del.pages, '1 Seite verwendet es. Ihre Werte bleiben als freie Felder erhalten.', '{n} Seiten verwenden es. Ihre Werte bleiben als freie Felder erhalten.') : tr('Keine Seite verwendet dieses Schema.')}
-          onConfirm={async () => { await api.del(`/admin/schemas/${del.id}`); reload(); }} />
+          onConfirm={async () => { try { await api.del(`/admin/schemas/${del.id}`); reload(); } catch (e) { toast(e.message, 'error'); } }} />
       )}
     </>
   );

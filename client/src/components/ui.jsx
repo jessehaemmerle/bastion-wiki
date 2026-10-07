@@ -29,6 +29,7 @@ export function Modal({ title, onClose, children, footer, size = '', icon }) {
 export function Confirm({ title, message, confirmLabel = tr('Bestätigen'), danger, onConfirm, onClose, requireText }) {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState('');
+  const [error, setError] = useState(null);
   return (
     <Modal
       title={title}
@@ -42,7 +43,9 @@ export function Confirm({ title, message, confirmLabel = tr('Bestätigen'), dang
             disabled={busy || (requireText && text !== requireText)}
             onClick={async () => {
               setBusy(true);
-              try { await onConfirm(); onClose(); } finally { setBusy(false); }
+              setError(null);
+              // A failed action keeps the dialog open and says why, instead of failing silently
+              try { await onConfirm(); onClose(); } catch (e) { setError(e?.message || tr('Fehler')); } finally { setBusy(false); }
             }}
           >
             {confirmLabel}
@@ -51,9 +54,10 @@ export function Confirm({ title, message, confirmLabel = tr('Bestätigen'), dang
       }
     >
       <div className="muted">{message}</div>
+      {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
       {requireText && (
         <div className="field">
-          <label>{tr('Zur Bestätigung')} <code className="mono">{requireText}</code> eingeben</label>
+          <label>{tr('Zur Bestätigung')} <code className="mono">{requireText}</code> {tr('eingeben')}</label>
           <input className="input" value={text} onChange={(e) => setText(e.target.value)} autoFocus />
         </div>
       )}
@@ -108,7 +112,7 @@ export function TagPill({ name, color, count, onRemove, link = true }) {
       <span className="hash">#</span>{name}
       {count != null && <span className="n">{count}</span>}
       {onRemove && (
-        <button type="button" onClick={(e) => { e.preventDefault(); onRemove(); }} aria-label={`${name} entfernen`}>
+        <button type="button" onClick={(e) => { e.preventDefault(); onRemove(); }} aria-label={tr('{name} entfernen', { name })}>
           <Icon name="x" size={12} />
         </button>
       )}

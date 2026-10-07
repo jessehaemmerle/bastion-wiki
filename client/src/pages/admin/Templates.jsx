@@ -21,7 +21,8 @@ function TemplateModal({ template, onClose, onSaved }) {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     try {
-      const body = { ...f, schemaId: f.schemaId ? Number(f.schemaId) : null };
+      // "" = all languages; the server stores that as NULL ('' violates the language check → 500)
+      const body = { ...f, language: f.language || null, schemaId: f.schemaId ? Number(f.schemaId) : null };
       if (template) await api.put(`/templates/${template.id}`, body);
       else await api.post('/templates', body);
       toast(tr('Vorlage gespeichert'));
@@ -67,7 +68,7 @@ function TemplateModal({ template, onClose, onSaved }) {
 
 export default function Templates() {
   const { toast } = useApp();
-  const { data, loading, reload } = useFetch('/templates');
+  const { data, error, loading, reload } = useFetch('/templates');
   const [edit, setEdit] = useState(null);
   const [del, setDel] = useState(null);
   return (
@@ -76,7 +77,7 @@ export default function Templates() {
         <div><h1>{tr('Vorlagen')}</h1><p>{tr('Vorlagen für einheitliche Dokumentation – Runbooks, Hosts, Incidents, Changes …')}</p></div>
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> {tr('Vorlage anlegen')}</button>
       </div>
-      {loading ? <Spinner /> : (
+      {loading ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : (
         <div className="grid-3">
           {data.templates.map((t) => (
             <div key={t.id} className="card pad col" style={{ gap: 10 }}>
@@ -101,7 +102,7 @@ export default function Templates() {
       )}
       {edit && <TemplateModal template={edit.id ? edit : null} onClose={() => setEdit(null)} onSaved={reload} />}
       {del && <Confirm danger title={tr('Vorlage löschen?')} message={tr('„{name}“ wird gelöscht. Bestehende Seiten bleiben unverändert.', { name: del.name })} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
-        onConfirm={async () => { await api.del(`/templates/${del.id}`); toast(tr('Vorlage gelöscht')); reload(); }} />}
+        onConfirm={async () => { try { await api.del(`/templates/${del.id}`); toast(tr('Vorlage gelöscht')); reload(); } catch (e) { toast(e.message, 'error'); } }} />}
     </>
   );
 }

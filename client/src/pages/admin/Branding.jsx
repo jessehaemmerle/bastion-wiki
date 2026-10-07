@@ -16,7 +16,9 @@ export default function Branding() {
   const { toast, loadSettings } = useApp();
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { api.get('/admin/settings').then((d) => setS(d.settings)); }, []);
+  const [error, setError] = useState(null);
+  useEffect(() => { api.get('/admin/settings').then((d) => setS(d.settings)).catch(setError); }, []);
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   if (!s) return <Spinner center />;
   const set = (k, v) => setS((x) => ({ ...x, [k]: v }));
   const save = async () => {

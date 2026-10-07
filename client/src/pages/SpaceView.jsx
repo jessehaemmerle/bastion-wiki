@@ -16,7 +16,10 @@ export default function SpaceView() {
   const navigate = useNavigate();
   const { treeVersion, refreshTree, toast, loadSpaces } = useApp();
   const { data, error, loading } = useFetch(`/spaces/${key}`, [treeVersion]);
-  const [type, setType] = useState('');
+  // the type filter belongs to one space – switching spaces starts unfiltered again
+  const [typeFilter, setTypeFilter] = useState({ key, type: '' });
+  const type = typeFilter.key === key ? typeFilter.type : '';
+  const setType = (t) => setTypeFilter({ key, type: t });
   const [modal, setModal] = useState(null);
   const pagesQuery = useFetch(`/pages${qs({ space: key, type, limit: 100 })}`, [treeVersion]);
   useChrome([{ label: tr('Bereiche'), to: '/spaces' }, { label: data?.space?.name || key }], key);

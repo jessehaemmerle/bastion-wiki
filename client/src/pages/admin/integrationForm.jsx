@@ -13,8 +13,9 @@ export function useIntegrations() {
   const { toast, loadSettings } = useApp();
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState({});
-  const load = useCallback(() => api.get('/admin/integrations').then((d) => { setData(d); setDraft({}); }), []);
-  useEffect(() => { load().catch((e) => toast(e.message, 'error')); }, [load, toast]);
+  const [error, setError] = useState(null);
+  const load = useCallback(() => api.get('/admin/integrations').then((d) => { setData(d); setDraft({}); setError(null); }), []);
+  useEffect(() => { load().catch(setError); }, [load]);
 
   const section = (name) => {
     const values = { ...(data?.integrations[name] || {}), ...(draft[name] || {}) };
@@ -38,7 +39,7 @@ export function useIntegrations() {
       },
     };
   };
-  return { data, section, reload: load };
+  return { data, error, section, reload: load };
 }
 
 /** One form field driven by a small schema */
@@ -79,7 +80,7 @@ export function Field({ f, sec, disabled }) {
     input = (
       <input id={id} className={`input ${f.mono ? 'mono' : ''}`} type={f.type === 'number' ? 'number' : 'text'} value={v ?? ''} disabled={disabled}
         placeholder={f.placeholder} min={f.min} max={f.max} spellCheck={false}
-        onChange={(e) => sec.set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)} />
+        onChange={(e) => sec.set(f.key, f.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)} />
     );
   }
   return (

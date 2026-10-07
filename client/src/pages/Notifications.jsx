@@ -56,7 +56,7 @@ export default function Notifications() {
     if (n.kind === 'run.finish' && n.data.runId) navigate(`/runs/${n.data.runId}`);
     else if (n.kind.startsWith('comment.') && n.pageId) navigate(`/p/${n.pageId}#comment-${n.data.commentId}`);
     else if (n.pageId) navigate(`/p/${n.pageId}`);
-    else setData((d) => ({ ...d, notifications: d.notifications.map((x) => (x.id === n.id ? { ...x, read: true } : x)) }));
+    else setData((d) => ({ ...d, unread: Math.max(0, d.unread - (n.read ? 0 : 1)), notifications: d.notifications.map((x) => (x.id === n.id ? { ...x, read: true } : x)) }));
   };
 
   if (loading && !data) return <Spinner center />;

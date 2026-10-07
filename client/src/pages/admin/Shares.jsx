@@ -8,11 +8,12 @@ import { tr } from '../../lib/i18n.js';
 
 export default function Shares() {
   const { toast, settings } = useApp();
-  const { data, reload, loading } = useFetch('/admin/shares');
+  const { data, error, reload, loading } = useFetch('/admin/shares');
   const revoke = async (s) => {
     try { await api.del(`/shares/${s.id}`); toast(tr('Freigabe widerrufen')); reload(); } catch (e) { toast(e.message, 'error'); }
   };
   if (loading && !data) return <Spinner center />;
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   const active = data.shares.filter((s) => !s.expired).length;
   return (
     <>

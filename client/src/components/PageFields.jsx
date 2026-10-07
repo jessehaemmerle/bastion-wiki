@@ -54,24 +54,32 @@ export function TagInput({ value, onChange }) {
 }
 
 export function PropertiesEditor({ value, onChange }) {
-  const rows = Object.entries(value);
-  const update = (i, k, v) => {
-    const next = rows.map((r, j) => (j === i ? [k, v] : r));
-    onChange(Object.fromEntries(next));
-  };
+  // Rows live locally so that two rows briefly sharing a name (e.g. while renaming "IPv6" to "IP…") are not merged and lost
+  const [rows, setRows] = useState(() => Object.entries(value));
+  useEffect(() => {
+    if (JSON.stringify(Object.fromEntries(rows)) !== JSON.stringify(value)) setRows(Object.entries(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  const commit = (next) => { setRows(next); onChange(Object.fromEntries(next)); };
+  const update = (i, k, v) => commit(rows.map((r, j) => (j === i ? [k, v] : r)));
+  const names = rows.map(([k]) => k);
+  const addRow = (k) => commit([...rows, [k, '']]);
+  let n = rows.length + 1;
+  while (names.includes(tr('Feld {n}', { n }))) n++;
   return (
     <div className="props-editor">
       {rows.map(([k, v], i) => (
         <div className="props-row" key={i}>
-          <input className="input" value={k} placeholder={tr('Feld (z. B. IP-Adresse)')} onChange={(e) => update(i, e.target.value, v)} />
+          <input className={`input ${k && names.indexOf(k) !== i ? 'invalid' : ''}`} value={k} placeholder={tr('Feld (z. B. IP-Adresse)')} onChange={(e) => update(i, e.target.value, v)}
+            title={k && names.indexOf(k) !== i ? tr('Feldname ist doppelt') : undefined} />
           <input className="input" value={v} placeholder={tr('Wert')} onChange={(e) => update(i, k, e.target.value)} />
-          <button type="button" className="btn ghost icon" onClick={() => onChange(Object.fromEntries(rows.filter((_, j) => j !== i)))} aria-label={tr('Entfernen')}><Icon name="x" size={15} /></button>
+          <button type="button" className="btn ghost icon" onClick={() => commit(rows.filter((_, j) => j !== i))} aria-label={tr('Entfernen')}><Icon name="x" size={15} /></button>
         </div>
       ))}
       <div className="row wrap">
-        <button type="button" className="btn sm" onClick={() => onChange({ ...value, [tr('Feld {n}', { n: rows.length + 1 })]: '' })}><Icon name="plus" size={14} /> {tr('Eigenschaft')}</button>
-        {[tr('Hostname'), tr('IP-Adresse'), tr('Verantwortlich'), tr('Umgebung')].filter((k) => !(k in value)).map((k) => (
-          <button type="button" key={k} className="btn sm ghost" onClick={() => onChange({ ...value, [k]: '' })}>+ {k}</button>
+        <button type="button" className="btn sm" onClick={() => addRow(tr('Feld {n}', { n }))}><Icon name="plus" size={14} /> {tr('Eigenschaft')}</button>
+        {[tr('Hostname'), tr('IP-Adresse'), tr('Verantwortlich'), tr('Umgebung')].filter((k) => !names.includes(k)).map((k) => (
+          <button type="button" key={k} className="btn sm ghost" onClick={() => addRow(k)}>+ {k}</button>
         ))}
       </div>
     </div>

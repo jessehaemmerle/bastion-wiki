@@ -14,7 +14,7 @@ const Editor = lazy(() => import('../components/editor/Editor.jsx'));
 
 export function SnippetList() {
   const [q, setQ] = useState('');
-  const { data, loading } = useFetch(`/snippets?q=${encodeURIComponent(q)}`);
+  const { data, error, loading } = useFetch(`/snippets?q=${encodeURIComponent(q)}`);
   useChrome([{ label: tr('Bausteine') }]);
   return (
     <div className="content narrow">
@@ -29,7 +29,7 @@ export function SnippetList() {
         <Icon name="search" size={15} />
         <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('Bausteine durchsuchen …')} aria-label={tr('Bausteine durchsuchen')} />
       </div>
-      {loading && !data ? <Spinner /> : !data.snippets.length ? (
+      {loading && !data ? <Spinner /> : error ? <Empty icon="alert-triangle" title={tr('Fehler')}>{error.message}</Empty> : !data.snippets.length ? (
         <Empty icon="layers" title={tr('Noch keine Bausteine')}>{tr('Lege den ersten Baustein an und füge ihn auf beliebig vielen Seiten ein.')}</Empty>
       ) : (
         <ul className="list card" style={{ padding: '0 16px' }}>
@@ -70,6 +70,7 @@ export function SnippetEdit() {
   if (error) return <NotFound message={error.message} />;
   if (!data) return <Spinner center />;
   const save = async () => {
+    if (saving) return;
     if (!form.name.trim()) { toast(tr('Bitte einen Namen angeben'), 'error'); return; }
     setSaving(true);
     try {
@@ -128,7 +129,9 @@ export function SnippetEdit() {
       {del && (
         <Confirm danger title={tr('Baustein löschen?')} confirmLabel={tr('Löschen')} onClose={() => setDel(false)}
           message={data.pages.length ? trn(data.pages.length, 'Er wird noch auf 1 Seite verwendet – dort erscheint dann ein Hinweis.', 'Er wird noch auf {n} Seiten verwendet – dort erscheint dann ein Hinweis.') : tr('Der Baustein wird nirgends verwendet.')}
-          onConfirm={async () => { await api.del(`/snippets/${id}`); toast(tr('Baustein gelöscht')); navigate('/snippets'); }} />
+          onConfirm={async () => {
+            try { await api.del(`/snippets/${id}`); toast(tr('Baustein gelöscht')); navigate('/snippets'); } catch (e) { toast(e.message, 'error'); }
+          }} />
       )}
     </div>
   );

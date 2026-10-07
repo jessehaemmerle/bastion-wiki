@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Icon from '../../components/Icon.jsx';
 import { Spinner, useCopy } from '../../components/ui.jsx';
 import { api } from '../../lib/api.js';
-import { tr } from '../../lib/i18n.js';
+import { tr, trServer } from '../../lib/i18n.js';
 import { ROLE_LABELS } from '../../lib/format.js';
 import { Field, SaveBar, TestResult, useIntegrations } from './integrationForm.jsx';
 
@@ -83,7 +83,7 @@ function Ldap({ sec }) {
         {result && (
           <TestResult result={{
             ok: result.ok && result.found !== false,
-            children: !result.ok ? result.error
+            children: !result.ok ? trServer(result.error)
               : result.found === false ? tr('Verbindung ok, aber kein Benutzer „{u}“ gefunden.', { u: username })
                 : result.found ? (
                   <div className="col" style={{ gap: 4 }}>
@@ -133,14 +133,15 @@ function Oidc({ sec, redirectUri }) {
         </div>
         <div className="form-grid">{fields.map((f) => <Field key={f.key} f={f} sec={sec} />)}</div>
         <SaveBar sec={sec}><button className="btn" onClick={test}><Icon name="radar" size={15} /> {tr('Discovery testen')}</button></SaveBar>
-        {result && <TestResult result={{ ok: result.ok, children: result.ok ? tr('Anbieter erreichbar: {issuer}', { issuer: result.issuer }) : result.error }} />}
+        {result && <TestResult result={{ ok: result.ok, children: result.ok ? tr('Anbieter erreichbar: {issuer}', { issuer: result.issuer }) : trServer(result.error) }} />}
       </div>
     </section>
   );
 }
 
 export default function Auth() {
-  const { data, section } = useIntegrations();
+  const { data, error, section } = useIntegrations();
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   if (!data) return <Spinner center />;
   return (
     <>

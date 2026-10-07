@@ -9,7 +9,7 @@ import { tr } from '../../lib/i18n.js';
 
 export default function AdminTags() {
   const { toast } = useApp();
-  const { data, loading, reload } = useFetch('/tags?all=true');
+  const { data, error, loading, reload } = useFetch('/tags?all=true');
   const [edit, setEdit] = useState(null);
   const [del, setDel] = useState(null);
   const [q, setQ] = useState('');
@@ -32,7 +32,7 @@ export default function AdminTags() {
           <div className="input-icon" style={{ maxWidth: 320, width: '100%' }}><Icon name="search" /><input className="input sm" placeholder={tr('Filtern …')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <span className="faint small">{tr('{n} Tags', { n: tags.length })}</span>
         </div>
-        {loading ? <Spinner /> : (
+        {loading ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : (
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>{tr('Tag')}</th><th>{tr('Seiten')}</th><th>{tr('Zuletzt verwendet')}</th><th /></tr></thead>
@@ -61,7 +61,7 @@ export default function AdminTags() {
         </Modal>
       )}
       {del && <Confirm danger title={tr('Tag löschen?')} message={tr('#{name} wird von {n} Seiten entfernt.', { name: del.name, n: del.count })} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
-        onConfirm={async () => { await api.del(`/tags/${del.id}`); toast(tr('Tag gelöscht')); reload(); }} />}
+        onConfirm={async () => { try { await api.del(`/tags/${del.id}`); toast(tr('Tag gelöscht')); reload(); } catch (e) { toast(e.message, 'error'); } }} />}
     </>
   );
 }

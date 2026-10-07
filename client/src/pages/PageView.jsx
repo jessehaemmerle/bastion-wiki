@@ -47,7 +47,7 @@ function Toc({ headings }) {
             <a href={`#${h.id}`} className={active === h.id ? 'active' : ''} onClick={(e) => {
               e.preventDefault();
               document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              history.replaceState(null, '', `#${h.id}`);
+              history.replaceState(history.state, '', `#${h.id}`);
             }}>{h.text}</a>
           </li>
         ))}
@@ -134,7 +134,8 @@ export default function PageView() {
   // "e" to edit
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'e' && canWrite && !e.metaKey && !e.ctrlKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+      if (e.key === 'e' && canWrite && !e.metaKey && !e.ctrlKey && !e.altKey && !document.querySelector('.modal, [role="dialog"]')
+        && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) {
         navigate(`/p/${id}/edit`);
       }
     };
@@ -150,21 +151,31 @@ export default function PageView() {
   const onHeadings = useCallback((h) => setHeadings(h), []);
   const onVariables = useCallback((names) => setVarNames((old) => (old.join('|') === names.join('|') ? old : names)), []);
 
-  const toggleTask = useCallback(async (index, checked) => {
-    if (!page) return;
-    const doc = new DOMParser().parseFromString(page.content, 'text/html');
-    const li = doc.querySelectorAll('ul[data-type="taskList"] > li')[index];
-    if (!li) return;
-    li.setAttribute('data-checked', String(checked));
-    const content = doc.body.innerHTML;
-    try {
-      const res = await api.put(`/pages/${page.id}`, { content, baseVersion: page.version, summary: tr('Checkliste aktualisiert') });
-      setData((d) => ({ page: { ...d.page, content, version: res.page.version, updatedAt: res.page.updatedAt } }));
-    } catch (e) {
-      toast(e.message, 'error');
-      reload();
-    }
-  }, [page, setData, toast, reload]);
+  // checklist ticks are saved one after another, each on top of the previous answer
+  // (otherwise a quick second tick is sent with the old content + version and fails with a conflict)
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const taskQueue = useRef(Promise.resolve());
+  const toggleTask = useCallback((index, checked) => {
+    const pageId = pageRef.current?.id;
+    taskQueue.current = taskQueue.current.then(async () => {
+      const cur = pageRef.current;
+      if (!cur || cur.id !== pageId) return;
+      const doc = new DOMParser().parseFromString(cur.content, 'text/html');
+      const li = doc.querySelectorAll('ul[data-type="taskList"] > li')[index];
+      if (!li) return;
+      li.setAttribute('data-checked', String(checked));
+      const content = doc.body.innerHTML;
+      try {
+        const res = await api.put(`/pages/${cur.id}`, { content, baseVersion: cur.version, summary: tr('Checkliste aktualisiert') });
+        pageRef.current = { ...cur, content, version: res.page.version, updatedAt: res.page.updatedAt };
+        setData((d) => (d?.page?.id === cur.id ? { page: { ...d.page, content, version: res.page.version, updatedAt: res.page.updatedAt } } : d));
+      } catch (e) {
+        toast(e.message, 'error');
+        reload();
+      }
+    });
+  }, [setData, toast, reload]);
 
   if (loading && !data) return <Spinner center />;
   if (error) return <NotFound message={error.message} />;

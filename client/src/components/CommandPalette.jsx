@@ -29,15 +29,17 @@ export default function CommandPalette() {
   useEffect(() => {
     if (!paletteOpen) return;
     const term = q.trim();
-    if (term.length < 2 && !/^(tag|space|type):/.test(term)) { setResults(null); return; }
+    if (term.length < 2 && !/^(tag|space|type):/.test(term)) { setResults(null); setLoading(false); return; }
     setLoading(true);
+    let cancelled = false; // a slower answer for an older query must not overwrite the current one
     const t = setTimeout(async () => {
-      try {
-        setResults(await api.get(`/search${qs({ q: term, limit: 8 })}`));
-      } catch { setResults(null); }
+      let res = null;
+      try { res = await api.get(`/search${qs({ q: term, limit: 8 })}`); } catch { /* keep null */ }
+      if (cancelled) return;
+      setResults(res);
       setLoading(false);
     }, 160);
-    return () => clearTimeout(t);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [q, paletteOpen]);
 
   const close = () => setPaletteOpen(false);
@@ -163,9 +165,9 @@ export default function CommandPalette() {
           })}
         </div>
         <div className="palette-foot">
-          <span><span className="kbd">↑↓</span> navigieren</span>
-          <span><span className="kbd">↵</span> öffnen</span>
-          <span><span className="kbd">{tr('tag:')}</span> <span className="kbd">{tr('space:')}</span> <span className="kbd">{tr('type:')}</span> filtern</span>
+          <span><span className="kbd">↑↓</span> {tr('navigieren')}</span>
+          <span><span className="kbd">↵</span> {tr('öffnen')}</span>
+          <span><span className="kbd">{tr('tag:')}</span> <span className="kbd">{tr('space:')}</span> <span className="kbd">{tr('type:')}</span> {tr('filtern')}</span>
         </div>
       </div>
     </div>,

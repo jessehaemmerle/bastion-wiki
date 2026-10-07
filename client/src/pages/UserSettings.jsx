@@ -119,7 +119,7 @@ function Appearance() {
 
 function Tokens() {
   const { toast } = useApp();
-  const { data, reload, loading } = useFetch('/me/tokens');
+  const { data, error, reload, loading } = useFetch('/me/tokens');
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [days, setDays] = useState(90);
@@ -142,7 +142,7 @@ function Tokens() {
           <div><h3>{tr('Persönliche API-Tokens')}</h3><div className="small faint">{tr('Für Skripte, CI/CD oder Monitoring – mit deinen Rechten.')}</div></div>
           <button className="btn primary sm" onClick={() => setCreating(true)}><Icon name="plus" size={14} /> {tr('Token erstellen')}</button>
         </div>
-        {loading ? <Spinner /> : (
+        {loading ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : (
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>{tr('Name')}</th><th>{tr('Präfix')}</th><th>{tr('Zuletzt genutzt')}</th><th>{tr('Läuft ab')}</th><th /></tr></thead>
@@ -152,8 +152,8 @@ function Tokens() {
                   <tr key={t.id}>
                     <td><strong>{t.name}</strong></td>
                     <td className="mono small">{t.token_prefix}…</td>
-                    <td className="small">{t.last_used_at ? timeAgo(t.last_used_at) : 'nie'}</td>
-                    <td className="small">{t.expires_at ? formatDate(t.expires_at) : 'nie'}</td>
+                    <td className="small">{t.last_used_at ? timeAgo(t.last_used_at) : tr('nie')}</td>
+                    <td className="small">{t.expires_at ? formatDate(t.expires_at) : tr('nie')}</td>
                     <td className="actions"><button className="btn ghost icon sm" onClick={() => setDel(t)}><Icon name="trash" size={14} /></button></td>
                   </tr>
                 ))}
@@ -193,8 +193,10 @@ curl -X POST -H "Authorization: Bearer $BASTION_TOKEN" \\
         </Modal>
       )}
       {del && (
-        <Confirm danger title={tr('Token widerrufen?')} message={`„${del.name}“ funktioniert danach nicht mehr.`} confirmLabel={tr('Widerrufen')} onClose={() => setDel(null)}
-          onConfirm={async () => { await api.del(`/me/tokens/${del.id}`); toast(tr('Token widerrufen')); reload(); }} />
+        <Confirm danger title={tr('Token widerrufen?')} message={tr('„{name}“ funktioniert danach nicht mehr.', { name: del.name })} confirmLabel={tr('Widerrufen')} onClose={() => setDel(null)}
+          onConfirm={async () => {
+            try { await api.del(`/me/tokens/${del.id}`); toast(tr('Token widerrufen')); reload(); } catch (e) { toast(e.message, 'error'); }
+          }} />
       )}
     </div>
   );
@@ -202,13 +204,16 @@ curl -X POST -H "Authorization: Bearer $BASTION_TOKEN" \\
 
 function Sessions() {
   const { toast } = useApp();
-  const { data, reload, loading } = useFetch('/me/sessions');
+  const { data, error, reload, loading } = useFetch('/me/sessions');
   if (loading) return <Spinner />;
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   return (
     <div className="card">
       <div className="card-header">
         <h3>{tr('Aktive Sitzungen')}</h3>
-        <button className="btn sm danger" onClick={async () => { await api.del('/me/sessions'); toast(tr('Andere Sitzungen beendet')); reload(); }}>
+        <button className="btn sm danger" onClick={async () => {
+          try { await api.del('/me/sessions'); toast(tr('Andere Sitzungen beendet')); reload(); } catch (e) { toast(e.message, 'error'); }
+        }}>
           <Icon name="log-out" size={14} /> {tr('Alle anderen abmelden')}
         </button>
       </div>
@@ -357,7 +362,7 @@ function Security() {
 
 function NotificationSettings() {
   const { user, updatePreferences, toast } = useApp();
-  const { data, reload } = useFetch('/me/watches');
+  const { data, error, reload } = useFetch('/me/watches');
   const prefs = user.preferences || {};
   const unwatch = async (w) => {
     try {
@@ -377,7 +382,7 @@ function NotificationSettings() {
       </div>
       <div className="card">
         <div className="card-header"><h3>{tr('Beobachtet')}</h3></div>
-        {!data ? <Spinner /> : (
+        {error ? <div className="error-box" role="alert">{error.message}</div> : !data ? <Spinner /> : (
           <ul className="list">
             {!data.watches.length && <li className="list-item faint small">{tr('Du beobachtest noch nichts.')}</li>}
             {data.watches.map((w) => (

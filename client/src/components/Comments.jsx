@@ -56,7 +56,7 @@ function Composer({ pageId, initial = '', placeholder, submitLabel, onSubmit, on
       close();
       await onSubmit(text.trim());
       setText('');
-    } finally { setBusy(false); }
+    } catch { /* failed (already reported): keep the text */ } finally { setBusy(false); }
   };
   return (
     <form className="composer" onSubmit={submit}>
@@ -109,7 +109,11 @@ function Comment({ c, pageId, me, canModerate, onChange, children, onReply, canR
         </div>
         {editing ? (
           <Composer pageId={pageId} initial={c.body} submitLabel={tr('Speichern')} autoFocus onCancel={() => setEditing(false)}
-            onSubmit={(body) => act(async () => { await api.patch(`/comments/${c.id}`, { body }); setEditing(false); })} />
+            onSubmit={async (body) => {
+              try { await api.patch(`/comments/${c.id}`, { body }); } catch (e) { toast(e.message, 'error'); throw e; }
+              setEditing(false);
+              onChange();
+            }} />
         ) : <Body text={c.body} />}
         {!editing && (
           <div className="comment-actions">

@@ -51,7 +51,7 @@ function GroupModal({ group, users, onClose, onSaved }) {
 
 export default function Groups() {
   const { toast } = useApp();
-  const { data, loading, reload } = useFetch('/admin/groups');
+  const { data, error, loading, reload } = useFetch('/admin/groups');
   const users = useFetch('/admin/users');
   const [edit, setEdit] = useState(null);
   const [del, setDel] = useState(null);
@@ -61,7 +61,7 @@ export default function Groups() {
         <div><h1>{tr('Gruppen')}</h1><p>{tr('Gruppen bündeln Personen – Bereichsrechte vergibst du dann einmal pro Gruppe.')}</p></div>
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> {tr('Gruppe anlegen')}</button>
       </div>
-      {loading ? <Spinner /> : !data.groups.length ? (
+      {loading ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : !data.groups.length ? (
         <div className="card"><Empty icon="users" title={tr('Noch keine Gruppen')}>{tr('Lege z. B. „Netzwerk“, „Linux“ oder „Service Desk“ an.')}</Empty></div>
       ) : (
         <div className="grid-3">
@@ -86,7 +86,7 @@ export default function Groups() {
       )}
       {edit && users.data && <GroupModal group={edit.id ? edit : null} users={users.data.users} onClose={() => setEdit(null)} onSaved={reload} />}
       {del && <Confirm danger title={tr('Gruppe löschen?')} message={tr('„{name}“ und alle zugehörigen Bereichsrechte werden entfernt.', { name: del.name })} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
-        onConfirm={async () => { await api.del(`/admin/groups/${del.id}`); toast(tr('Gruppe gelöscht')); reload(); }} />}
+        onConfirm={async () => { try { await api.del(`/admin/groups/${del.id}`); toast(tr('Gruppe gelöscht')); reload(); } catch (e) { toast(e.message, 'error'); } }} />}
     </>
   );
 }

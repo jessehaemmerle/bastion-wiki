@@ -34,9 +34,10 @@ function Row({ r, mine }) {
 }
 
 export default function Approvals() {
-  const { data, loading } = useFetch('/approvals');
+  const { data, error, loading } = useFetch('/approvals');
   useChrome([{ label: tr('Freigaben') }]);
   if (loading && !data) return <Spinner center />;
+  if (error) return <div className="content narrow"><Empty icon="alert-triangle" title={tr('Fehler')}>{error.message}</Empty></div>;
   return (
     <div className="content narrow">
       <div className="page-head">

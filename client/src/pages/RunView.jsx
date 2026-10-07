@@ -84,12 +84,17 @@ export default function RunView() {
 
   // others may tick steps at the same time: refresh while the run is open
   useEffect(() => {
+    // (quietly: a failed poll – e.g. a network blip – must not replace the open run by an error page)
     if (!live) return undefined;
-    const t = setInterval(() => { if (document.visibilityState === 'visible') reload(); }, 10000);
+    let stopped = false;
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      api.get(`/runs/${id}`).then((d) => { if (!stopped) setData(d); }).catch(() => {});
+    }, 10000);
     const c = setInterval(() => setNow(Date.now()), 30000);
-    return () => { clearInterval(t); clearInterval(c); };
+    return () => { stopped = true; clearInterval(t); clearInterval(c); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live]);
+  }, [live, id]);
 
   const sections = useMemo(() => {
     const out = [];

@@ -10,7 +10,7 @@ import { tr } from '../../lib/i18n.js';
 
 export default function Links() {
   const { toast } = useApp();
-  const { data, reload, loading } = useFetch('/admin/ops/links');
+  const { data, error, reload, loading } = useFetch('/admin/ops/links');
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('broken');
   const check = async () => {
@@ -23,6 +23,7 @@ export default function Links() {
     setBusy(false);
   };
   if (loading && !data) return <Spinner center />;
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   const { stats, broken, external, unlinked } = data;
   const tabs = [
     ['broken', 'unlink', tr('Tote interne Links'), broken.length],

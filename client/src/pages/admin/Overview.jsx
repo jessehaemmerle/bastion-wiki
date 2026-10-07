@@ -11,7 +11,8 @@ export function AuditAction({ action }) {
 }
 
 export default function Overview() {
-  const { data, loading } = useFetch('/admin/overview');
+  const { data, error, loading } = useFetch('/admin/overview');
+  if (error) return <div className="error-box" role="alert">{error.message}</div>;
   if (loading || !data) return <Spinner center />;
   const { counts: c, system: s } = data;
   const rows = [

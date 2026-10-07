@@ -229,7 +229,7 @@ function RunForm({ job, onStarted }) {
         <button className="btn primary lg" onClick={start} disabled={busy || (mode === 'existing' && !spaceId)}>
           {busy ? <span className="spinner" /> : <Icon name="download" />} {tr('{n} Seiten importieren', { n: job.preview?.pages })}
         </button>
-        <button className="btn ghost" onClick={async () => { await api.del(`/admin/imports/${job.id}`); onStarted(); }}>{tr('Verwerfen')}</button>
+        <button className="btn ghost" onClick={async () => { try { await api.del(`/admin/imports/${job.id}`); onStarted(); } catch (e) { toast(e.message, 'error'); } }}>{tr('Verwerfen')}</button>
       </div>
     </div>
   );
@@ -330,8 +330,8 @@ function SourceForm({ source, onCreated, onBack }) {
       if (extra) fd.append('extra', extra);
       for (const [k, v] of Object.entries(fields)) fd.append(k, v);
       const res = await fetch('/api/admin/imports', { method: 'POST', body: fd, credentials: 'same-origin' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const data = res.headers.get('content-type')?.includes('json') ? await res.json() : {};
+      if (!res.ok) throw new Error(data.error ? trServer(data.error) : `HTTP ${res.status}`);
       onCreated(data.job.id);
     } catch (err) {
       toast(err.message, 'error');

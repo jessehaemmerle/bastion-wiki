@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '../Icon.jsx';
 import { Modal } from '../ui.jsx';
 import { api } from '../../lib/api.js';
@@ -13,12 +13,15 @@ import { tr } from '../../lib/i18n.js';
 function SecretView({ node, editor, deleteNode, selected }) {
   const { secretId, label } = node.attrs;
   const [shown, setShown] = useState(null);
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
   const reveal = async () => {
+    clearTimeout(timer.current); // an older auto-hide must not cut a later reveal short
     if (shown !== null) { setShown(null); return; }
     try {
       const { value } = await api.post(`/secrets/${secretId}/reveal`);
       setShown(value);
-      setTimeout(() => setShown(null), 30000);
+      timer.current = setTimeout(() => setShown(null), 30000);
     } catch (e) { setShown(`⚠ ${e.message}`); }
   };
   return (

@@ -28,7 +28,7 @@ export default function Trash() {
   const space = params.get('space') || '';
   const navigate = useNavigate();
   const { toast, refreshTree, spaces } = useApp();
-  const { data, loading, reload } = useFetch(`/trash${space ? `?space=${encodeURIComponent(space)}` : ''}`);
+  const { data, error, loading, reload } = useFetch(`/trash${space ? `?space=${encodeURIComponent(space)}` : ''}`);
   const [purge, setPurge] = useState(null);
   const [target, setTarget] = useState(null);
   useChrome([{ label: tr('Papierkorb') }]);
@@ -57,7 +57,7 @@ export default function Trash() {
           {spaces.map((s) => <option key={s.id} value={s.key}>{s.name}</option>)}
         </select>
       </div>
-      {loading && !data ? <Spinner /> : !data.entries.length ? (
+      {loading && !data ? <Spinner /> : error ? <Empty icon="alert-triangle" title={tr('Fehler')}>{error.message}</Empty> : !data.entries.length ? (
         <Empty icon="trash" title={tr('Der Papierkorb ist leer')}>{tr('Hier landen gelöschte Seiten aus Bereichen, in denen du schreiben darfst.')}</Empty>
       ) : (
         <div className="card table-wrap">

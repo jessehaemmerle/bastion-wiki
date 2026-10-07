@@ -124,7 +124,9 @@ export default function PageEdit({ isNew = false }) {
     if (!form || draft !== null) return;
     try {
       const d = JSON.parse(localStorage.getItem(draftKey(id)) || 'null');
-      if (d && (!page || new Date(d.savedAt) > new Date(page.updatedAt)) && d.form.content !== form.content) setDraft(d);
+      // offer the draft if it differs in anything that is saved (not only the text: a changed title or data sheet counts too)
+      const pick = (x) => JSON.stringify([x.title, x.content, x.properties, x.tags, x.schemaId ?? null]);
+      if (d?.form && (!page || new Date(d.savedAt) > new Date(page.updatedAt)) && pick(d.form) !== pick(form)) setDraft(d);
       else setDraft(false);
     } catch { setDraft(false); }
   }, [form, page, id, draft]);
@@ -175,11 +177,14 @@ export default function PageEdit({ isNew = false }) {
     } catch (e) { toast(e.message, 'error'); return []; }
   }), [isNew, id, toast]);
 
+  const savingRef = useRef(false); // Ctrl+S (incl. key repeat) must not start a second save while one is running
   const save = useCallback(async () => {
     const f = formRef.current;
+    if (savingRef.current || !f) return;
     if (!f.title.trim()) { toast(tr('Bitte einen Titel angeben'), 'error'); return; }
     const sp = spaces.find((s) => s.key === f.spaceKey);
     if (isNew && !sp) { toast(tr('Bitte einen Bereich wählen'), 'error'); return; }
+    savingRef.current = true;
     setSaving(true);
     const schema = schemas.find((x) => x.id === f.schemaId);
     const errs = checkSheet(schema, f.properties);
@@ -187,6 +192,7 @@ export default function PageEdit({ isNew = false }) {
     if (Object.keys(errs).length) {
       setShowMeta(true);
       toast(tr('Datenblatt unvollständig: {fields}', { fields: Object.keys(errs).join(', ') }), 'error');
+      savingRef.current = false;
       setSaving(false);
       return;
     }
@@ -205,9 +211,15 @@ export default function PageEdit({ isNew = false }) {
       refreshTree();
       navigate(`/p/${res.page.id}`);
     } catch (e) {
+      // conflict: the server asks to reload. Stamp the draft now, so it is still offered after the reload
+      // (otherwise it looks older than the other person's save and is silently dropped)
+      if (e.status === 409) {
+        try { localStorage.setItem(draftKey(id), JSON.stringify({ savedAt: new Date().toISOString(), form: f })); } catch { /* full */ }
+      }
       const fields = e.data?.details?.fields;
       toast(fields?.length > 1 ? `${e.message} (+${fields.length - 1})` : e.message, 'error');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }, [isNew, id, page, spaces, toast, refreshTree, navigate, schemas, ownRequest, bypass]);

@@ -10,7 +10,7 @@ import { tr } from '../../lib/i18n.js';
 
 export default function AdminSpaces() {
   const { loadSpaces } = useApp();
-  const { data, loading, reload } = useFetch('/admin/spaces');
+  const { data, error, loading, reload } = useFetch('/admin/spaces');
   const [edit, setEdit] = useState(null);
   const [perms, setPerms] = useState(null);
   const done = () => { reload(); loadSpaces(); };
@@ -21,7 +21,7 @@ export default function AdminSpaces() {
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> {tr('Bereich anlegen')}</button>
       </div>
       <div className="card">
-        {loading ? <Spinner /> : (
+        {loading ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : (
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>{tr('Bereich')}</th><th>{tr('Schlüssel')}</th><th>{tr('Standardzugriff')}</th><th>{tr('Explizite Rechte')}</th><th>{tr('Seiten')}</th><th>{tr('Aktivität')}</th><th /></tr></thead>

@@ -15,8 +15,12 @@ export function timeAgo(date) {
   return tr('gerade eben');
 }
 
+// "2026-10-07" (date columns) is a calendar day: parse it as local midnight, not UTC
+// (new Date('2026-10-07') would show the 6th west of UTC)
+const toDate = (d) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T00:00:00`) : new Date(d));
+
 export const formatDate = (d, withTime = false) =>
-  d ? new Date(d).toLocaleString(getLocale(), withTime
+  d ? toDate(d).toLocaleString(getLocale(), withTime
     ? { dateStyle: 'medium', timeStyle: 'short' }
     : { dateStyle: 'medium' }) : '–';
 

@@ -15,7 +15,7 @@ export default function Audit() {
   const [q, setQ] = useState('');
   const [offset, setOffset] = useState(0);
   const [open, setOpen] = useState(null);
-  const { data, loading } = useFetch(`/admin/audit${qs({ action, q, offset, limit: PAGE })}`);
+  const { data, error, loading } = useFetch(`/admin/audit${qs({ action, q, offset, limit: PAGE })}`);
   return (
     <>
       <div className="page-head">
@@ -31,7 +31,7 @@ export default function Audit() {
           </div>
           <span className="faint small">{tr('{n} Einträge', { n: data?.total ?? 0 })}</span>
         </div>
-        {loading && !data ? <Spinner /> : (
+        {loading && !data ? <Spinner /> : error ? <div className="error-box" role="alert">{error.message}</div> : (
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>{tr('Zeitpunkt')}</th><th>{tr('Aktion')}</th><th>{tr('Benutzer')}</th><th>{tr('Objekt')}</th><th>{tr('IP')}</th><th /></tr></thead>

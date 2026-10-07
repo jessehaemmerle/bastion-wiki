@@ -47,7 +47,9 @@ export function PermissionsModal({ page, onClose, onSaved }) {
       setData(d);
       setEntries(d.entries.map((e) => ({ type: e.principalType, id: e.principalId, name: e.name, level: e.level })));
     }).catch((e) => { toast(e.message, 'error'); onClose(); });
-  }, [page.id, toast, onClose]);
+    // load once per page: onClose is a new function on every parent render and would reset the edited list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page.id]);
   const exclude = useMemo(() => new Set(entries.map((e) => `${e.type}:${e.id}`)), [entries]);
   const save = async () => {
     setBusy(true);

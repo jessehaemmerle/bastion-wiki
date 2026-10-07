@@ -22,13 +22,15 @@ async function request(method, url, body, opts = {}) {
     throw new ApiError(0, tr('Keine Verbindung zum Server – bist du offline?'));
   }
   if (opts.raw) return res;
-  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+  let data = null;
+  // an empty or broken JSON body (proxy error page, aborted response) must still end up as an ApiError
+  if (res.headers.get('content-type')?.includes('json')) data = await res.json().catch(() => null);
   if (!res.ok) {
     const err = new ApiError(res.status, data?.error ? trServer(data.error) : tr('Fehler {n}', { n: res.status }), data);
     if (res.status === 401 && !url.startsWith('/auth/')) window.dispatchEvent(new CustomEvent('bastion:unauthorized'));
     throw err;
   }
-  if (res.headers.get('X-Bastion-Offline')) data.__offline = true;
+  if (data && res.headers.get('X-Bastion-Offline')) data.__offline = true;
   return data;
 }
 
