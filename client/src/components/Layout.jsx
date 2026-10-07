@@ -55,7 +55,7 @@ export default function Layout() {
   useEffect(() => setMobileNav(false), [location.pathname]);
 
   // favourites + recently viewed (refreshed when navigating)
-  const [quick, setQuick] = useState({ recent: [], favorites: [] });
+  const [quick, setQuick] = useState({ recent: [], favorites: [], approvals: 0 });
   const [openSections, setOpenSections] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bastion.sidebar.sections') || '{}'); } catch { return {}; }
   });
@@ -100,6 +100,25 @@ export default function Layout() {
           <NavLink to="/review" className="nav-item"><Icon name="calendar-clock" size={16} /> {tr('Zu prüfen')}</NavLink>
           <NavLink to="/tags" className="nav-item"><Icon name="tags" size={16} /> {tr('Tags')}</NavLink>
           <NavLink to="/inventory" className="nav-item"><Icon name="server" size={16} /> {tr('Inventar')}</NavLink>
+          <NavLink to="/expiring" className="nav-item"><Icon name="calendar" size={16} /> {tr('Fristen')}</NavLink>
+          <NavLink to="/approvals" className="nav-item"><Icon name="badge-check" size={16} /> {tr('Freigaben')}{quick.approvals > 0 && <span className="count nav-badge">{quick.approvals}</span>}</NavLink>
+          <div className="sidebar-section quick">
+            <button type="button" className="sidebar-section-head toggle" aria-expanded={openSections.tools ?? false} onClick={() => setOpenSections((o) => {
+              const n = { ...o, tools: !(o.tools ?? false) };
+              try { localStorage.setItem('bastion.sidebar.sections', JSON.stringify(n)); } catch { /* ignore */ }
+              return n;
+            })}>
+              <span>{tr('Werkzeuge')}</span>
+              <Icon name="chevron-down" size={14} className={(openSections.tools ?? false) ? '' : 'rot'} />
+            </button>
+            {(openSections.tools ?? false) && (
+              <>
+                <NavLink to="/snippets" className="nav-item small"><Icon name="layers" size={15} /> {tr('Bausteine')}</NavLink>
+                <Link to="/handbook" className="nav-item small"><Icon name="printer" size={15} /> {tr('Notfallhandbuch')}</Link>
+                <NavLink to="/trash" className="nav-item small"><Icon name="trash" size={15} /> {tr('Papierkorb')}</NavLink>
+              </>
+            )}
+          </div>
 
           {[['favorites', tr('Favoriten'), quick.favorites], ['recent', tr('Zuletzt angesehen'), quick.recent]].map(([key, label, items]) => items.length > 0 && (
             <div className="sidebar-section quick" key={key}>

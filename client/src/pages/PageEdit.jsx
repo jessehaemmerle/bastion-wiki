@@ -12,6 +12,7 @@ import { useChrome } from '../lib/hooks.js';
 import { PAGE_TYPES, timeAgo } from '../lib/format.js';
 import { getLanguage, getLocale, tr } from '../lib/i18n.js';
 import { EditorsBanner } from '../components/PageExtras.jsx';
+import { checkSheet, SchemaFieldsEditor, splitProps } from '../components/SheetFields.jsx';
 
 const draftKey = (id) => `bastion.draft.${id || 'new'}`;
 
@@ -61,6 +62,13 @@ export default function PageEdit({ isNew = false }) {
   const [tree, setTree] = useState(null);
   const [showMeta, setShowMeta] = useState(true);
   const [editors, setEditors] = useState([]);
+  const [schemas, setSchemas] = useState([]);
+  const [sheetErrors, setSheetErrors] = useState({});
+  const [pending, setPending] = useState(null); // open change request of somebody else
+  const [ownRequest, setOwnRequest] = useState(false);
+  const [bypass, setBypass] = useState(false);
+  const { user } = useApp();
+  useEffect(() => { api.get('/schemas').then((d) => setSchemas(d.schemas)).catch(() => {}); }, []);
   const formRef = useRef(form);
   formRef.current = form;
 
@@ -72,18 +80,30 @@ export default function PageEdit({ isNew = false }) {
       const spaceKey = params.get('space') || writable[0]?.key || '';
       setForm({
         title: '', content: '', spaceKey, parentId: params.get('parent') ? Number(params.get('parent')) : null,
-        pageType: 'doc', icon: '', tags: [], properties: {}, reviewDue: '', summary: '',
+        pageType: 'doc', icon: '', tags: [], properties: {}, reviewDue: '', summary: '', schemaId: null,
       });
       return;
     }
-    api.get(`/pages/${id}`).then(({ page }) => {
+    api.get(`/pages/${id}`).then(async ({ page }) => {
       if (!['write', 'admin'].includes(page.access)) throw new Error(tr('Keine Schreibrechte für diese Seite'));
       setPage(page);
-      setForm({
+      let base = {
         title: page.title, content: page.content, spaceKey: page.space.key, parentId: page.parentId, pageType: page.pageType,
         icon: page.icon || '', tags: page.tags.map((t) => t.name), properties: page.properties || {}, reviewDue: page.reviewDue || '', summary: '',
-      });
-      setShowMeta(Object.keys(page.properties || {}).length > 0);
+        schemaId: page.schemaId || null,
+      };
+      // approval workflow: continue the own open proposal, or wait for somebody else's
+      if (page.approval?.pending) {
+        if (page.approval.pending.mine) {
+          const { request } = await api.get(`/pages/${page.id}/change-request`);
+          if (request) {
+            base = { ...base, title: request.title, content: request.content, properties: request.properties || {}, schemaId: request.schemaId ?? base.schemaId, summary: request.summary, ...(request.tags ? { tags: request.tags } : {}) };
+            setOwnRequest(true);
+          }
+        } else setPending(page.approval.pending);
+      }
+      setForm(base);
+      setShowMeta(Object.keys(base.properties || {}).length > 0 || Boolean(base.schemaId));
     }).catch(setError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isNew]);
@@ -161,32 +181,43 @@ export default function PageEdit({ isNew = false }) {
     const sp = spaces.find((s) => s.key === f.spaceKey);
     if (isNew && !sp) { toast(tr('Bitte einen Bereich wählen'), 'error'); return; }
     setSaving(true);
+    const schema = schemas.find((x) => x.id === f.schemaId);
+    const errs = checkSheet(schema, f.properties);
+    setSheetErrors(errs);
+    if (Object.keys(errs).length) {
+      setShowMeta(true);
+      toast(tr('Datenblatt unvollständig: {fields}', { fields: Object.keys(errs).join(', ') }), 'error');
+      setSaving(false);
+      return;
+    }
+    const props = Object.fromEntries(Object.entries(f.properties).filter(([k, v]) => k.trim() && (v !== '' || !schema?.fields.some((x) => x.label === k))));
     const body = {
       title: f.title, content: f.content, pageType: f.pageType, icon: f.icon || null, tags: f.tags,
-      properties: f.properties, reviewDue: f.reviewDue || null, summary: f.summary, parentId: f.parentId || null,
+      properties: props, reviewDue: f.reviewDue || null, summary: f.summary, parentId: f.parentId || null, schemaId: f.schemaId || null,
     };
     try {
       const res = isNew
         ? await api.post('/pages', { ...body, spaceId: sp.id })
-        : await api.put(`/pages/${id}`, { ...body, baseVersion: page.version });
+        : await api.put(`/pages/${id}`, { ...body, ...(ownRequest ? {} : { baseVersion: page.version }), ...(bypass ? { bypassApproval: true } : {}) });
       localStorage.removeItem(draftKey(id));
       setDirty(false);
-      toast(isNew ? tr('Seite erstellt') : tr('Gespeichert'));
+      toast(res.pending ? tr('Änderungsvorschlag eingereicht – wartet auf Freigabe') : isNew ? tr('Seite erstellt') : tr('Gespeichert'));
       refreshTree();
       navigate(`/p/${res.page.id}`);
     } catch (e) {
-      toast(e.message, 'error');
+      const fields = e.data?.details?.fields;
+      toast(fields?.length > 1 ? `${e.message} (+${fields.length - 1})` : e.message, 'error');
     } finally {
       setSaving(false);
     }
-  }, [isNew, id, page, spaces, toast, refreshTree, navigate]);
+  }, [isNew, id, page, spaces, toast, refreshTree, navigate, schemas, ownRequest, bypass]);
 
   const pickTemplate = (t) => {
     if (t) {
       const reviewDue = settings.reviewIntervalDays && ['runbook', 'host', 'service', 'network'].includes(t.pageType)
         ? new Date(Date.now() + settings.reviewIntervalDays * 864e5).toISOString().slice(0, 10) : '';
-      setForm((f) => ({ ...f, content: t.content, pageType: t.pageType, properties: { ...t.properties }, tags: [...new Set([...f.tags, ...t.tags])], reviewDue }));
-      setShowMeta(Object.keys(t.properties).length > 0);
+      setForm((f) => ({ ...f, content: t.content, pageType: t.pageType, properties: { ...t.properties }, tags: [...new Set([...f.tags, ...t.tags])], reviewDue, schemaId: t.schemaId || null }));
+      setShowMeta(Object.keys(t.properties).length > 0 || Boolean(t.schemaId));
     }
     setTemplateChosen(true);
     setEditorKey((k) => k + 1);
@@ -220,6 +251,20 @@ export default function PageEdit({ isNew = false }) {
         )}
 
         <EditorsBanner editors={editors} editing />
+        {page?.approval?.required && !pending && (
+          <div className="presence-banner approval" role="status">
+            <Icon name="badge-check" size={16} />
+            <span>{ownRequest
+              ? tr('Du bearbeitest deinen offenen Änderungsvorschlag. Speichern aktualisiert ihn.')
+              : tr('Diese Seite ist freigabepflichtig: Speichern reicht einen Änderungsvorschlag ein, der erst nach Freigabe sichtbar wird.')}</span>
+            {user.role === 'admin' && <label className="row small" style={{ gap: 6, marginLeft: 'auto' }}><input type="checkbox" checked={bypass} onChange={(e) => setBypass(e.target.checked)} /> {tr('Ohne Freigabe veröffentlichen')}</label>}
+          </div>
+        )}
+        {pending && (
+          <div className="error-box" role="alert">
+            {tr('{name} hat einen Änderungsvorschlag eingereicht, der noch auf Freigabe wartet. Weitere Änderungen sind erst danach möglich.', { name: pending.author })}
+          </div>
+        )}
         <div className="row between wrap">
           <span className="eyebrow">{isNew ? tr('Neue Seite') : tr('Version {n} bearbeiten', { n: page.version })}</span>
           <button className="btn ghost sm" onClick={() => setShowMeta((s) => !s)}>
@@ -274,9 +319,30 @@ export default function PageEdit({ isNew = false }) {
               <TagInput value={form.tags} onChange={(t) => set('tags', t)} />
             </div>
             <div className="field">
-              <label>{tr('Eigenschaften')} <span className="faint">{tr('(strukturierte Daten wie Hostname, IP, Owner – durchsuchbar)')}</span></label>
-              <PropertiesEditor value={form.properties} onChange={(p) => set('properties', p)} />
+              <label htmlFor="pe-schema">{tr('Datenblatt')}</label>
+              <select id="pe-schema" className="select" style={{ maxWidth: 360 }} value={form.schemaId || ''}
+                onChange={(e) => { set('schemaId', e.target.value ? Number(e.target.value) : null); setSheetErrors({}); }}>
+                <option value="">{tr('Freie Felder (ohne Schema)')}</option>
+                {schemas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+              <span className="hint">{tr('Ein Schema gibt Felder mit Typ, Pflichtangaben und Ablaufdaten vor. Optional – freie Felder gehen immer zusätzlich.')}</span>
             </div>
+            {(() => {
+              const schema = schemas.find((x) => x.id === form.schemaId);
+              const { typed, free } = splitProps(schema, form.properties);
+              return (
+                <>
+                  {schema && (
+                    <SchemaFieldsEditor schema={schema} value={typed} errors={sheetErrors}
+                      onChange={(t) => set('properties', { ...t, ...free })} />
+                  )}
+                  <div className="field" style={{ marginTop: schema ? 14 : 0 }}>
+                    <label>{schema ? tr('Weitere Felder') : tr('Eigenschaften')} <span className="faint">{tr('(strukturierte Daten wie Hostname, IP, Owner – durchsuchbar)')}</span></label>
+                    <PropertiesEditor value={free} onChange={(p) => set('properties', { ...typed, ...p })} />
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
         {!showMeta && form.tags.length > 0 && <div className="page-tags" style={{ margin: '10px 0' }}>{form.tags.map((t) => <TagPill key={t} name={t} link={false} />)}</div>}
@@ -291,8 +357,8 @@ export default function PageEdit({ isNew = false }) {
           </span>
           <input className="input sm grow desktop-only" style={{ maxWidth: 360, marginLeft: 'auto' }} placeholder={tr('Änderungsnotiz (optional)')} value={form.summary} onChange={(e) => set('summary', e.target.value)} />
           <button className="btn" onClick={() => { if (!dirty || confirm(tr('Änderungen verwerfen?'))) { localStorage.removeItem(draftKey(id)); navigate(isNew ? (space ? `/s/${space.key}` : '/') : `/p/${id}`); } }}>{tr('Abbrechen')}</button>
-          <button className="btn primary" onClick={save} disabled={saving}>
-            {saving ? <span className="spinner" /> : <Icon name="save" />} {tr('Speichern')} <span className="kbd desktop-only" style={{ background: 'transparent', color: 'inherit', borderColor: 'rgba(255,255,255,.3)' }}>{tr('Strg S')}</span>
+          <button className="btn primary" onClick={save} disabled={saving || Boolean(pending)}>
+            {saving ? <span className="spinner" /> : <Icon name="save" />} {page?.approval?.required && !bypass ? tr('Zur Freigabe einreichen') : tr('Speichern')} <span className="kbd desktop-only" style={{ background: 'transparent', color: 'inherit', borderColor: 'rgba(255,255,255,.3)' }}>{tr('Strg S')}</span>
           </button>
         </div>
       </div>

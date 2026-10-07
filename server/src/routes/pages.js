@@ -9,6 +9,11 @@ import { backlinks, syncLinks } from '../lib/links.js';
 import { cloneSecrets, linkSecrets } from '../lib/secrets.js';
 import { notifyPageEvent } from '../lib/notify.js';
 import { editorsOf } from '../lib/presence.js';
+import { trashPage } from '../lib/trash.js';
+import { assertProperties, loadSchema, mapSchema } from '../lib/schemas.js';
+import { expandSnippets, snippetMap } from '../lib/snippets.js';
+import { submitChangeRequest, pendingFor } from '../lib/approvals.js';
+import { isRestricted } from '../lib/permissions.js';
 import { pageMarkdown, secretPlaceholdersHtml } from '../lib/markdown.js';
 
 const router = Router();
@@ -29,6 +34,7 @@ const pageSchema = {
   isPinned: { type: 'bool' },
   summary: { type: 'string', max: 300 },
   baseVersion: { type: 'int' },
+  schemaId: { type: 'int', nullable: true },
 };
 
 export function cleanProperties(props) {
@@ -110,7 +116,7 @@ const LIST_SELECT = `
 
 // ------------------------------------------------------------------ lists
 router.get('/pages', async (req, res) => {
-  const where = ['space_access(p.space_id, $1) >= 1'];
+  const where = ['page_access(p.id, $1) >= 1'];
   const params = [req.user.id];
   const add = (sql, v) => { params.push(v); where.push(sql.replace('?', `$${params.length}`)); };
   if (req.query.space) add('s.key = ?', String(req.query.space));
@@ -130,26 +136,26 @@ router.get('/pages', async (req, res) => {
 router.get('/dashboard', async (req, res) => {
   const uid = req.user.id;
   const [recent, favorites, overdue, mine, pinned, stats, activity, runs] = await Promise.all([
-    many(`${LIST_SELECT} WHERE space_access(p.space_id,$1) >= 1 ORDER BY p.updated_at DESC LIMIT 8`, [uid]),
-    many(`${LIST_SELECT} JOIN favorites f ON f.page_id = p.id AND f.user_id = $1 WHERE space_access(p.space_id,$1) >= 1 ORDER BY f.created_at DESC LIMIT 12`, [uid]),
-    many(`${LIST_SELECT} WHERE space_access(p.space_id,$1) >= 1 AND p.review_due < current_date + 7 ORDER BY p.review_due ASC LIMIT 8`, [uid]),
-    many(`${LIST_SELECT} WHERE space_access(p.space_id,$1) >= 1 AND p.updated_by = $1 ORDER BY p.updated_at DESC LIMIT 6`, [uid]),
-    many(`${LIST_SELECT} WHERE space_access(p.space_id,$1) >= 1 AND p.is_pinned ORDER BY p.title LIMIT 12`, [uid]),
+    many(`${LIST_SELECT} WHERE page_access(p.id,$1) >= 1 ORDER BY p.updated_at DESC LIMIT 8`, [uid]),
+    many(`${LIST_SELECT} JOIN favorites f ON f.page_id = p.id AND f.user_id = $1 WHERE page_access(p.id,$1) >= 1 ORDER BY f.created_at DESC LIMIT 12`, [uid]),
+    many(`${LIST_SELECT} WHERE page_access(p.id,$1) >= 1 AND p.review_due < current_date + 7 ORDER BY p.review_due ASC LIMIT 8`, [uid]),
+    many(`${LIST_SELECT} WHERE page_access(p.id,$1) >= 1 AND p.updated_by = $1 ORDER BY p.updated_at DESC LIMIT 6`, [uid]),
+    many(`${LIST_SELECT} WHERE page_access(p.id,$1) >= 1 AND p.is_pinned ORDER BY p.title LIMIT 12`, [uid]),
     one(`SELECT count(*)::int AS pages,
                 count(DISTINCT p.space_id)::int AS spaces,
                 count(*) FILTER (WHERE p.updated_at > now() - interval '7 days')::int AS updated_week,
                 count(*) FILTER (WHERE p.review_due < current_date)::int AS overdue,
-                (SELECT count(DISTINCT pt.tag_id) FROM page_tags pt JOIN pages p2 ON p2.id=pt.page_id WHERE space_access(p2.space_id,$1) >= 1)::int AS tags
-           FROM pages p WHERE space_access(p.space_id,$1) >= 1`, [uid]),
+                (SELECT count(DISTINCT pt.tag_id) FROM page_tags pt JOIN pages p2 ON p2.id=pt.page_id WHERE page_access(p2.id,$1) >= 1)::int AS tags
+           FROM pages p WHERE page_access(p.id,$1) >= 1`, [uid]),
     many(`SELECT date_trunc('day', r.created_at)::date AS day, count(*)::int AS edits
             FROM page_revisions r JOIN pages p ON p.id = r.page_id
-           WHERE r.created_at > now() - interval '30 days' AND space_access(p.space_id,$1) >= 1
+           WHERE r.created_at > now() - interval '30 days' AND page_access(p.id,$1) >= 1
            GROUP BY 1 ORDER BY 1`, [uid]),
     many(`SELECT r.id, r.title, r.page_id, r.started_at, r.reason, u.display_name AS started_by,
                  (SELECT count(*) FROM jsonb_array_elements(r.steps) x WHERE (x->>'done')::boolean)::int AS done,
                  jsonb_array_length(r.steps) AS total
             FROM runbook_runs r JOIN pages p ON p.id=r.page_id LEFT JOIN users u ON u.id=r.started_by
-           WHERE r.status='running' AND space_access(p.space_id,$1) >= 1 ORDER BY r.started_at DESC LIMIT 6`, [uid]),
+           WHERE r.status='running' AND page_access(p.id,$1) >= 1 ORDER BY r.started_at DESC LIMIT 6`, [uid]),
   ]);
   res.json({
     recent: recent.map(mapListPage),
@@ -166,7 +172,7 @@ router.get('/dashboard', async (req, res) => {
 // ------------------------------------------------------------------ single page
 router.get('/pages/:id', async (req, res) => {
   const page = await loadPage(req.user, intParam(req.params.id));
-  const [space, tags, breadcrumbs, children, attachments, fav, authors, links, watch, runs] = await Promise.all([
+  const [space, tags, breadcrumbs, children, attachments, fav, authors, links, watch, runs, extra, schema, snippets, pending, restricted] = await Promise.all([
     one('SELECT * FROM spaces WHERE id=$1', [page.space_id]),
     many('SELECT t.name, t.color FROM page_tags pt JOIN tags t ON t.id=pt.tag_id WHERE pt.page_id=$1 ORDER BY t.name', [page.id]),
     many(
@@ -175,7 +181,7 @@ router.get('/pages/:id', async (req, res) => {
        SELECT id, title FROM up WHERE id<>$1 ORDER BY depth DESC`,
       [page.id],
     ),
-    many('SELECT id, title, icon, page_type FROM pages WHERE parent_id=$1 ORDER BY sort_order, title', [page.id]),
+    many('SELECT id, title, icon, page_type FROM pages WHERE parent_id=$1 AND page_access(id, $2) >= 1 ORDER BY sort_order, title', [page.id, req.user.id]),
     many(
       `SELECT a.id, a.filename, a.mime_type, a.size_bytes, a.created_at, u.display_name AS uploaded_by
          FROM attachments a LEFT JOIN users u ON u.id=a.uploaded_by WHERE a.page_id=$1 ORDER BY a.created_at DESC`,
@@ -191,6 +197,14 @@ router.get('/pages/:id', async (req, res) => {
     one(`SELECT EXISTS (SELECT 1 FROM watches WHERE user_id=$1 AND page_id=$2) AS page,
                 EXISTS (SELECT 1 FROM watches WHERE user_id=$1 AND space_id=$3) AS space`, [req.user.id, page.id, page.space_id]),
     one(`SELECT count(*)::int AS total, count(*) FILTER (WHERE status='running')::int AS running FROM runbook_runs WHERE page_id=$1`, [page.id]),
+    one(`SELECT (SELECT count(*) FROM comments WHERE page_id=$1 AND parent_id IS NULL AND resolved_at IS NULL)::int AS open_comments,
+                (SELECT count(*) FROM comments WHERE page_id=$1)::int AS comments,
+                (SELECT name FROM groups WHERE id=$2) AS approver_group,
+                EXISTS (SELECT 1 FROM page_permissions WHERE page_id=$1) AS own_restriction`, [page.id, page.approver_group_id]),
+    page.schema_id ? one('SELECT * FROM sheet_schemas WHERE id=$1', [page.schema_id]) : null,
+    snippetMap(page.content),
+    pendingFor(page, req.user),
+    isRestricted(page.id),
   ]);
   query(
     `INSERT INTO page_views (user_id, page_id) VALUES ($1,$2) ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at=now()`,
@@ -214,6 +228,15 @@ router.get('/pages/:id', async (req, res) => {
       watching: { page: watch.page, space: watch.space },
       runs,
       editors: editorsOf(page.id, req.user.id),
+      schemaId: page.schema_id, schema: mapSchema(schema),
+      snippets,
+      comments: { open: extra.open_comments, total: extra.comments },
+      approval: {
+        required: page.approval_required,
+        group: page.approver_group_id ? { id: page.approver_group_id, name: extra.approver_group } : null,
+        pending,
+      },
+      restricted: { self: extra.own_restriction, inherited: restricted && !extra.own_restriction },
     },
   });
 });
@@ -223,6 +246,7 @@ router.post('/pages', async (req, res) => {
   const space = await loadSpace(req.user, b.spaceId, LEVEL.write);
   const content = sanitize(b.content);
   const properties = cleanProperties(b.properties);
+  assertProperties(await loadSchema(b.schemaId), properties);
   const page = await tx(async (c) => {
     await assertParent(c, b.parentId ?? null, space.id);
     const slug = await uniqueSlug(c, space.id, b.title);
@@ -232,10 +256,10 @@ router.post('/pages', async (req, res) => {
     );
     const { rows } = await c.query(
       `INSERT INTO pages (space_id, parent_id, title, slug, icon, content, content_text, page_type, properties,
-                          sort_order, review_due, is_pinned, created_by, updated_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) RETURNING *`,
+                          sort_order, review_due, is_pinned, created_by, updated_by, schema_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13,$14) RETURNING *`,
       [space.id, b.parentId ?? null, b.title, slug, b.icon ?? null, content, htmlToText(content), b.pageType || 'doc',
-        properties, next, b.reviewDue ?? null, Boolean(b.isPinned), req.user.id],
+        properties, next, b.reviewDue ?? null, Boolean(b.isPinned), req.user.id, b.schemaId ?? null],
     );
     await c.query(
       `INSERT INTO page_revisions (page_id, version, title, content, properties, summary, author_id)
@@ -253,50 +277,77 @@ router.post('/pages', async (req, res) => {
   res.status(201).json({ page: { id: page.id, slug: page.slug, spaceKey: space.key, version: page.version } });
 });
 
+/**
+ * Writes changes to a page (inside transaction `c`). Used for direct edits and approved change requests.
+ * fields: title, content (sanitized), properties (clean), schemaId, tags, icon, pageType, reviewDue, isPinned, parentId
+ */
+export async function writePage(c, current, fields, author, summary = '') {
+  const title = fields.title ?? current.title;
+  const content = fields.content !== undefined ? fields.content : current.content;
+  const properties = fields.properties !== undefined ? fields.properties : current.properties;
+  const schemaId = fields.schemaId !== undefined ? fields.schemaId : current.schema_id;
+  const contentChanged = content !== current.content || title !== current.title
+    || JSON.stringify(properties) !== JSON.stringify(current.properties) || schemaId !== current.schema_id;
+  if (fields.parentId !== undefined) await assertParent(c, fields.parentId, current.space_id, current.id);
+  const slug = title !== current.title ? await uniqueSlug(c, current.space_id, title, current.id) : current.slug;
+  const version = contentChanged ? current.version + 1 : current.version;
+  const { rows } = await c.query(
+    `UPDATE pages SET title=$2, slug=$3, content=$4, content_text=$5, properties=$6,
+            icon=$7, page_type=$8, review_due=$9, is_pinned=$10, parent_id=$11,
+            version=$12, updated_by=$13, updated_at=now(), schema_id=$14
+      WHERE id=$1 RETURNING *`,
+    [current.id, title, slug, content, htmlToText(content), properties,
+      fields.icon !== undefined ? fields.icon : current.icon, fields.pageType ?? current.page_type,
+      fields.reviewDue !== undefined ? fields.reviewDue : current.review_due,
+      fields.isPinned ?? current.is_pinned, fields.parentId !== undefined ? fields.parentId : current.parent_id,
+      version, author.id, schemaId],
+  );
+  if (contentChanged) {
+    await c.query(
+      `INSERT INTO page_revisions (page_id, version, title, content, properties, summary, author_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [current.id, version, title, content, properties, summary || '', author.id],
+    );
+  }
+  if (fields.tags) await setTags(c, current.id, fields.tags);
+  if (content !== current.content) {
+    await syncLinks(c, current.id, content);
+    await linkSecrets(c, current.id, current.space_id, content);
+  }
+  if (contentChanged) await autoWatch(c, author, current.id);
+  return { page: rows[0], contentChanged };
+}
+
+const CONTENT_KEYS = ['title', 'content', 'properties', 'tags', 'schemaId'];
+
 router.put('/pages/:id', async (req, res) => {
   const current = await loadPage(req.user, intParam(req.params.id), LEVEL.write);
-  const b = pick(req.body, pageSchema, { partial: true });
+  const b = pick(req.body, { ...pageSchema, bypassApproval: { type: 'bool' } }, { partial: true });
   if (b.baseVersion && b.baseVersion !== current.version) {
     const who = await one('SELECT display_name FROM users WHERE id=$1', [current.updated_by]);
     throw conflict(`Die Seite wurde zwischenzeitlich von ${who?.display_name || 'jemand anderem'} bearbeitet (Version ${current.version}). Bitte neu laden.`);
   }
-  const title = b.title ?? current.title;
-  const content = b.content !== undefined ? sanitize(b.content) : current.content;
-  const properties = b.properties !== undefined ? cleanProperties(b.properties) : current.properties;
-  const contentChanged = content !== current.content || title !== current.title
-    || JSON.stringify(properties) !== JSON.stringify(current.properties);
+  const fields = { ...b };
+  if (b.content !== undefined) fields.content = sanitize(b.content);
+  if (b.properties !== undefined) fields.properties = cleanProperties(b.properties);
+  // data sheet: typed fields are checked whenever properties or the schema change
+  if (b.properties !== undefined || b.schemaId !== undefined) {
+    const schema = await loadSchema(b.schemaId !== undefined ? b.schemaId : current.schema_id);
+    assertProperties(schema, fields.properties ?? current.properties);
+  }
 
-  const page = await tx(async (c) => {
-    if (b.parentId !== undefined) await assertParent(c, b.parentId, current.space_id, current.id);
-    const slug = title !== current.title ? await uniqueSlug(c, current.space_id, title, current.id) : current.slug;
-    const version = contentChanged ? current.version + 1 : current.version;
-    const { rows } = await c.query(
-      `UPDATE pages SET title=$2, slug=$3, content=$4, content_text=$5, properties=$6,
-              icon=$7, page_type=$8, review_due=$9, is_pinned=$10, parent_id=$11,
-              version=$12, updated_by=$13, updated_at=now()
-        WHERE id=$1 RETURNING *`,
-      [current.id, title, slug, content, htmlToText(content), properties,
-        b.icon !== undefined ? b.icon : current.icon, b.pageType ?? current.page_type,
-        b.reviewDue !== undefined ? b.reviewDue : current.review_due,
-        b.isPinned ?? current.is_pinned, b.parentId !== undefined ? b.parentId : current.parent_id,
-        version, req.user.id],
-    );
-    if (contentChanged) {
-      await c.query(
-        `INSERT INTO page_revisions (page_id, version, title, content, properties, summary, author_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [current.id, version, title, content, properties, b.summary || '', req.user.id],
-      );
-    }
-    if (b.tags) await setTags(c, current.id, b.tags);
-    if (content !== current.content) {
-      await syncLinks(c, current.id, content);
-      await linkSecrets(c, current.id, current.space_id, content);
-    }
-    if (contentChanged) await autoWatch(c, req.user, current.id);
-    return rows[0];
-  });
-  await audit(req, 'page.update', 'page', page.id, { title: page.title, version: page.version });
+  // approval workflow: content changes become a change request (admins may publish directly)
+  const touchesContent = CONTENT_KEYS.some((k) => b[k] !== undefined);
+  if (current.approval_required && touchesContent && !(b.bypassApproval && req.user.role === 'admin')) {
+    const request = await submitChangeRequest(current, fields, req.user);
+    const meta = Object.fromEntries(Object.entries(fields).filter(([k]) => !CONTENT_KEYS.includes(k) && k in pageSchema && k !== 'summary' && k !== 'baseVersion'));
+    if (Object.keys(meta).length) await tx((c) => writePage(c, current, meta, req.user));
+    await audit(req, 'page.change_request', 'page', current.id, { request: request.id });
+    return res.status(202).json({ pending: true, changeRequest: { id: request.id }, page: { id: current.id, version: current.version } });
+  }
+
+  const { page, contentChanged } = await tx((c) => writePage(c, current, fields, req.user, b.summary));
+  await audit(req, 'page.update', 'page', page.id, { title: page.title, version: page.version, bypassApproval: Boolean(current.approval_required && touchesContent) });
   if (contentChanged) notifyPageEvent('page.update', page, req.user, { version: page.version, summary: b.summary || '' });
   res.json({ page: { id: page.id, slug: page.slug, version: page.version, updatedAt: page.updated_at } });
 });
@@ -305,11 +356,8 @@ router.delete('/pages/:id', async (req, res) => {
   const page = await loadPage(req.user, intParam(req.params.id), LEVEL.write);
   // watchers are removed together with the page, so they hear about it first
   await notifyPageEvent('page.delete', page, req.user);
-  // Children move up one level instead of disappearing
-  await tx(async (c) => {
-    await c.query('UPDATE pages SET parent_id=$2 WHERE parent_id=$1', [page.id, page.parent_id]);
-    await c.query('DELETE FROM pages WHERE id=$1', [page.id]);
-  });
+  // into the trash; children move up one level and come back on restore
+  await tx((c) => trashPage(c, page, req.user.id));
   await audit(req, 'page.delete', 'page', page.id, { title: page.title });
   res.json({ ok: true });
 });
@@ -429,6 +477,10 @@ router.post('/pages/:id/revisions/:version/restore', async (req, res) => {
   const version = intParam(req.params.version, 'Version');
   const r = await one('SELECT * FROM page_revisions WHERE page_id=$1 AND version=$2', [page.id, version]);
   if (!r) throw notFound('Version nicht gefunden');
+  if (page.approval_required && req.user.role !== 'admin') {
+    const request = await submitChangeRequest(page, { title: r.title, content: r.content, properties: r.properties, summary: `Wiederherstellung von Version ${version}` }, req.user);
+    return res.status(202).json({ pending: true, changeRequest: { id: request.id } });
+  }
   const next = page.version + 1;
   await tx(async (c) => {
     await c.query(
@@ -449,6 +501,7 @@ router.post('/pages/:id/revisions/:version/restore', async (req, res) => {
 // ------------------------------------------------------------------ export
 router.get('/pages/:id/export', async (req, res) => {
   const page = await loadPage(req.user, intParam(req.params.id));
+  page.content = await expandSnippets(page.content);
   const format = req.query.format === 'html' ? 'html' : 'md';
   const name = page.slug || `page-${page.id}`;
   if (format === 'html') {

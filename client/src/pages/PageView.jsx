@@ -12,6 +12,9 @@ import { buildTree } from '../components/PageTree.jsx';
 import { tr } from '../lib/i18n.js';
 import Variables from '../components/Variables.jsx';
 import { EditorsBanner, References, RunsSection, ShareModal, StartRunModal } from '../components/PageExtras.jsx';
+import Comments from '../components/Comments.jsx';
+import { ApprovalSettingsModal, ChangeRequestModal, PendingBanner, PermissionsModal } from '../components/PageGovernance.jsx';
+import { FieldValue } from '../components/SheetFields.jsx';
 
 function PropValue({ value }) {
   if (/^https?:\/\/\S+$/.test(value)) return <a href={value} target="_blank" rel="noopener noreferrer">{value}</a>;
@@ -106,6 +109,7 @@ export default function PageView() {
   const { data, error, loading, setData, reload } = useFetch(`/pages/${id}`);
   const [headings, setHeadings] = useState([]);
   const [varNames, setVarNames] = useState([]);
+  const [openComments, setOpenComments] = useState(null);
   const [vars, setVars] = useState({});
   const [modal, setModal] = useState(null);
   const [copied, copy] = useCopy();
@@ -166,7 +170,11 @@ export default function PageView() {
   const type = PAGE_TYPES[page.pageType] || PAGE_TYPES.doc;
   const today = new Date().toISOString().slice(0, 10);
   const overdue = page.reviewDue && page.reviewDue < today;
-  const props = Object.entries(page.properties || {});
+  const schemaOrder = (page.schema?.fields || []).map((f) => f.label);
+  const props = [
+    ...schemaOrder.filter((k) => k in (page.properties || {})).map((k) => [k, page.properties[k]]),
+    ...Object.entries(page.properties || {}).filter(([k]) => !schemaOrder.includes(k)),
+  ];
   const readMin = Math.max(1, Math.round(page.wordCount / 200));
 
   const act = async (fn, msg) => {
@@ -212,6 +220,12 @@ export default function PageView() {
           <div className="page-actions">
             <div className="page-kicker">
               {page.pageType !== 'doc' && <span className="tape lg">{type.label}</span>}
+              {(page.restricted?.self || page.restricted?.inherited) && (
+                <span className="kicker-flag" title={page.restricted.self ? tr('Nur für ausgewählte Personen und Gruppen sichtbar') : tr('Eingeschränkt durch eine übergeordnete Seite')}>
+                  <Icon name="lock" size={13} /> {tr('Eingeschränkt')}
+                </span>
+              )}
+              {page.approval?.required && <span className="kicker-flag" title={tr('Änderungen brauchen eine Freigabe')}><Icon name="badge-check" size={13} /> {tr('Freigabepflichtig')}</span>}
               <Link to={`/s/${page.space.key}`} className="row" style={{ gap: 6 }}><span className="cable" style={{ '--sc': page.space.color }} />{page.space.name}</Link>
             </div>
             <div className="page-toolbar">
@@ -221,6 +235,10 @@ export default function PageView() {
                 title={page.watching?.page ? tr('Nicht mehr beobachten') : page.watching?.space ? tr('Bereich wird beobachtet – Seite zusätzlich beobachten') : tr('Beobachten')}
                 aria-pressed={Boolean(page.watching?.page)} aria-label={tr('Beobachten')}>
                 <Icon name={page.watching?.page || page.watching?.space ? 'bell-ring' : 'bell'} size={15} />
+              </button>
+              <button className="btn sm comments-btn" onClick={() => document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth' })}
+                title={tr('Kommentare')} aria-label={tr('Kommentare')}>
+                <Icon name="message" size={15} /> <span className="mono">{openComments ?? page.comments?.open ?? 0}</span>
               </button>
               <button className={`btn sm icon ${page.isFavorite ? 'active' : ''}`} onClick={toggleFavorite} title={page.isFavorite ? tr('Favorit entfernen') : tr('Als Favorit markieren')}>
                 <Icon name="star" size={15} fill={page.isFavorite ? 'currentColor' : 'none'} />
@@ -235,6 +253,8 @@ export default function PageView() {
                 {canWrite && <MenuItem icon="paperclip" onClick={() => uploadRef.current?.click()}>{tr('Datei anhängen')}</MenuItem>}
                 {canWrite && !runnable && <MenuItem icon="play" onClick={() => setModal('run')}>{tr('Als Durchlauf ausführen')}</MenuItem>}
                 {canWrite && settings.allowSharing !== false && <MenuItem icon="share" onClick={() => setModal('share')}>{tr('Freigabelink …')}</MenuItem>}
+                {canWrite && <MenuItem icon="lock" onClick={() => setModal('perms')}>{tr('Berechtigungen …')}</MenuItem>}
+                {canWrite && <MenuItem icon="badge-check" onClick={() => setModal('approval')}>{tr('Freigabe-Workflow …')}</MenuItem>}
                 <div className="menu-sep" />
                 <MenuItem icon="download" href={`/api/pages/${page.id}/export?format=md`}>{tr('Als Markdown exportieren')}</MenuItem>
                 <MenuItem icon="file-code" href={`/api/pages/${page.id}/export?format=html`}>{tr('Als HTML exportieren')}</MenuItem>
@@ -256,6 +276,7 @@ export default function PageView() {
             {page.reviewDue && !overdue && <span>{tr('Nächstes Review {date}', { date: formatDate(page.reviewDue) })}</span>}
           </div>
           <EditorsBanner editors={page.editors} />
+          <PendingBanner page={page} onOpen={() => setModal('change')} />
           {page.runs?.running > 0 && (
             <div className="presence-banner run">
               <Icon name="play" size={16} />
@@ -279,27 +300,32 @@ export default function PageView() {
             <section className="spec" aria-label={tr('Eigenschaften')}>
               <div className="spec-head">
                 <span>{tr('Datenblatt')}</span>
+                {page.schema && <span className="faint small">{page.schema.name}</span>}
               </div>
               <div className="spec-grid">
-                {props.map(([k, v]) => (
-                  <div className="spec-item" key={k}>
-                    <div className="k">{k}</div>
-                    <div className="v">
-                      <PropValue value={v} />
-                      {v && (
-                        <button onClick={() => copy(v, k)} title={tr('Kopieren')} aria-label={`${k} kopieren`}>
-                          <Icon name={copied === k ? 'check' : 'copy'} size={13} />
-                        </button>
-                      )}
+                {props.map(([k, v]) => {
+                  const field = page.schema?.fields.find((f) => f.label === k);
+                  return (
+                    <div className="spec-item" key={k}>
+                      <div className="k">{k}</div>
+                      <div className="v">
+                        {field ? <FieldValue field={field} value={v} /> : <PropValue value={v} />}
+                        {v && (
+                          <button onClick={() => copy(v, k)} title={tr('Kopieren')} aria-label={`${k} kopieren`}>
+                            <Icon name={copied === k ? 'check' : 'copy'} size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
 
           <Variables names={varNames} pageId={page.id} properties={page.properties} value={vars} onChange={setVars} />
-          <ContentView html={page.content} onHeadings={onHeadings} onToggleTask={canWrite ? toggleTask : undefined} onVariables={onVariables} variables={vars} />
+          <ContentView html={page.content} snippets={page.snippets} onHeadings={onHeadings}
+            onToggleTask={canWrite && !page.approval?.required ? toggleTask : undefined} onVariables={onVariables} variables={vars} />
           {!page.content?.replace(/<[^>]+>/g, '').trim() && !page.content?.includes('<img') && (
             <div className="faint" style={{ padding: '20px 0' }}>{tr('Diese Seite hat noch keinen Inhalt.')} {canWrite && <Link to={`/p/${page.id}/edit`}>{tr('Seite bearbeiten')}</Link>}</div>
           )}
@@ -340,6 +366,7 @@ export default function PageView() {
           )}
           <div id="runs"><RunsSection page={page} canWrite={canWrite} onStart={() => setModal('run')} /></div>
           <References page={page} />
+          <Comments page={page} onCount={setOpenComments} />
           <input ref={uploadRef} type="file" multiple hidden onChange={(e) => { upload([...e.target.files]); e.target.value = ''; }} />
         </article>
 
@@ -357,6 +384,9 @@ export default function PageView() {
         </aside>
       </div>
 
+      {modal === 'perms' && <PermissionsModal page={page} onClose={() => setModal(null)} onSaved={() => { reload(); refreshTree(); }} />}
+      {modal === 'approval' && <ApprovalSettingsModal page={page} onClose={() => setModal(null)} onSaved={reload} />}
+      {modal === 'change' && <ChangeRequestModal page={page} onClose={() => setModal(null)} onDone={() => { reload(); refreshTree(); }} />}
       {modal === 'run' && <StartRunModal page={page} onClose={() => setModal(null)} />}
       {modal === 'share' && <ShareModal page={page} onClose={() => setModal(null)} />}
       {modal === 'move' && <MoveModal page={page} onClose={() => setModal(null)} onMoved={() => { refreshTree(); reload(); }} />}
@@ -364,14 +394,14 @@ export default function PageView() {
         <Confirm
           danger
           title={tr('Seite löschen?')}
-          message={<>{tr('„{title}“ wird mit allen Versionen und Anhängen gelöscht.', { title: page.title })} {page.children.length > 0 && tr('Unterseiten werden eine Ebene nach oben verschoben.')}</>}
+          message={<>{tr('„{title}“ kommt mit allen Versionen und Anhängen in den Papierkorb und kann {n} Tage lang wiederhergestellt werden.', { title: page.title, n: settings.trashDays || 30 })} {page.children.length > 0 && tr('Unterseiten werden eine Ebene nach oben verschoben.')}</>}
           confirmLabel={tr('Löschen')}
           onClose={() => setModal(null)}
           onConfirm={() => act(async () => {
             await api.del(`/pages/${page.id}`);
             refreshTree();
             navigate(page.parentId ? `/p/${page.parentId}` : `/s/${page.space.key}`);
-          }, tr('Seite gelöscht'))}
+          }, tr('Seite in den Papierkorb verschoben'))}
         />
       )}
     </div>

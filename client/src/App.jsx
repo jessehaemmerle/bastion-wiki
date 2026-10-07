@@ -18,10 +18,15 @@ import Inventory from './pages/Inventory.jsx';
 import RunView from './pages/RunView.jsx';
 import Notifications from './pages/Notifications.jsx';
 import SharedPage from './pages/SharedPage.jsx';
+import Trash from './pages/Trash.jsx';
+import Expiring from './pages/Expiring.jsx';
+import Approvals from './pages/Approvals.jsx';
+import { SnippetEdit, SnippetList } from './pages/Snippets.jsx';
 
 // The editor and admin panel are big – load them on demand
 const PageEdit = lazy(() => import('./pages/PageEdit.jsx'));
 const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
+const Handbook = lazy(() => import('./pages/Handbook.jsx'));
 
 function RequireAuth({ children, role }) {
   const { user } = useApp();
@@ -42,6 +47,7 @@ export default function App() {
         <Route path="/register" element={<Login register />} />
         <Route path="/share/:token" element={<SharedPage />} />
         <Route path="/admin/*" element={<RequireAuth role="admin"><AdminApp /></RequireAuth>} />
+        <Route path="/handbook" element={<RequireAuth><Handbook /></RequireAuth>} />
         <Route element={<RequireAuth><Layout /></RequireAuth>}>
           <Route index element={<Dashboard />} />
           <Route path="spaces" element={<Spaces />} />
@@ -57,6 +63,11 @@ export default function App() {
           <Route path="inventory/:type?" element={<Inventory />} />
           <Route path="runs/:id" element={<RunView />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="trash" element={<Trash />} />
+          <Route path="expiring" element={<Expiring />} />
+          <Route path="approvals" element={<Approvals />} />
+          <Route path="snippets" element={<SnippetList />} />
+          <Route path="snippets/:id" element={<SnippetEdit />} />
           <Route path="settings/:tab?" element={<UserSettings />} />
           <Route path="*" element={<NotFound />} />
         </Route>

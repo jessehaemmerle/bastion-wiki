@@ -11,12 +11,13 @@ export const DEFAULT_SETTINGS = {
   allowRegistration: false,
   defaultRole: 'editor',
   reviewIntervalDays: 180,
+  trashDays: 30,
   announcement: '',
   customCss: '',
   footerText: '',
 };
 
-const PUBLIC_KEYS = ['siteName', 'tagline', 'defaultTheme', 'defaultMode', 'defaultLanguage', 'accentColor', 'allowRegistration', 'announcement', 'customCss', 'footerText', 'reviewIntervalDays'];
+const PUBLIC_KEYS = ['siteName', 'tagline', 'defaultTheme', 'defaultMode', 'defaultLanguage', 'accentColor', 'allowRegistration', 'announcement', 'customCss', 'footerText', 'reviewIntervalDays', 'trashDays'];
 
 let cache = null;
 

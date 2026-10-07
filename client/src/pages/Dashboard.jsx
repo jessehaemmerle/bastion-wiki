@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import PageList from '../components/PageList.jsx';
@@ -8,6 +8,8 @@ import { useApp } from '../lib/context.jsx';
 import { useChrome, useFetch } from '../lib/hooks.js';
 import { PAGE_TYPES, shortWhen } from '../lib/format.js';
 import { getLocale, tr, trn } from '../lib/i18n.js';
+import { ExpiryList } from './Expiring.jsx';
+import { api } from '../lib/api.js';
 
 const EXAMPLES = ['type:runbook', 'type:host', 'space:infra', 'tag:linux'];
 
@@ -37,6 +39,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data, loading } = useFetch('/dashboard');
   const [q, setQ] = useState('');
+  const [expiring, setExpiring] = useState([]);
+  useEffect(() => { api.get('/expiring?days=30').then((d) => setExpiring(d.items)).catch(() => {}); }, []);
   useChrome([{ label: tr('Start') }]);
 
   if (loading && !data) return <Spinner center />;
@@ -90,6 +94,12 @@ export default function Dashboard() {
                   </Link>
                 ))}
               </div>
+            </section>
+          )}
+          {expiring.length > 0 && (
+            <section>
+              <div className="section-h"><h2>{tr('Fristen, 30 Tage')}</h2><Link to="/expiring">{tr('Alle')}</Link></div>
+              <ExpiryList items={expiring.slice(0, 8)} compact />
             </section>
           )}
           {data?.pinned?.length > 0 && (

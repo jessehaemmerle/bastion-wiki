@@ -24,12 +24,13 @@ export const SLASH_ITEMS = [
   { title: 'Tabelle', desc: '3×3 Tabelle mit Kopfzeile', icon: 'grid', keywords: 'table tabelle', run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { title: 'Zitat', desc: 'Zitat oder Auszug', icon: 'message', keywords: 'quote blockquote', run: (e) => e.chain().focus().toggleBlockquote().run() },
   { title: 'Trennlinie', desc: 'Horizontale Linie', icon: 'more', keywords: 'hr divider line', run: (e) => e.chain().focus().setHorizontalRule().run() },
-  { title: 'Geheimnis', desc: 'Passwort, Schlüssel – verschlüsselt', icon: 'lock', keywords: 'secret passwort password credential schlüssel key token', run: (e, ctx) => { e.chain().focus().run(); ctx?.newSecret?.(); } },
+  { title: 'Geheimnis', desc: 'Passwort, Schlüssel – verschlüsselt', icon: 'lock', needs: 'newSecret', keywords: 'secret passwort password credential schlüssel key token', run: (e, ctx) => { e.chain().focus().run(); ctx?.newSecret?.(); } },
   { title: 'Diagramm', desc: 'Mermaid: Ablauf, Netz, Sequenz', icon: 'waypoints', keywords: 'mermaid diagram flowchart sequence diagramm netzplan', run: (e) => e.chain().focus().insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: MERMAID_SAMPLE }] }).run() },
+  { title: 'Baustein', desc: 'Wiederverwendbarer Textblock', icon: 'layers', needs: 'pickSnippet', keywords: 'snippet baustein vorlage include block', run: (e, ctx) => { e.chain().focus().run(); ctx?.pickSnippet?.(); } },
   { title: 'Bild', desc: 'Bild hochladen', icon: 'upload', keywords: 'image bild foto upload', run: (e, ctx) => { e.chain().focus().run(); ctx?.pickImage?.(); } },
 ];
 
-export function filterSlashItems(query) {
+export function filterSlashItems(query, ctx = {}) {
   const q = query.toLowerCase();
-  return SLASH_ITEMS.filter((i) => !q || i.title.toLowerCase().includes(q) || tr(i.title).toLowerCase().includes(q) || i.keywords.includes(q)).slice(0, 14);
+  return SLASH_ITEMS.filter((i) => !i.needs || ctx[i.needs]).filter((i) => !q || i.title.toLowerCase().includes(q) || tr(i.title).toLowerCase().includes(q) || i.keywords.includes(q)).slice(0, 16);
 }

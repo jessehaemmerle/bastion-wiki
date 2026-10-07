@@ -96,6 +96,10 @@ export default function Branding() {
           <div><h3>{tr('Review-Intervall')}</h3><p>{tr('Standardabstand in Tagen, wenn eine Seite als geprüft markiert wird oder aus einer Ops-Vorlage entsteht.')}</p></div>
           <div className="row"><input type="number" min={1} max={3650} className="input" style={{ maxWidth: 140 }} value={s.reviewIntervalDays} onChange={(e) => set('reviewIntervalDays', Number(e.target.value))} /> <span className="muted">{tr('Tage')}</span></div>
         </section>
+        <section className="settings-section">
+          <div><h3>{tr('Papierkorb')}</h3><p>{tr('So lange bleiben gelöschte Seiten wiederherstellbar, danach werden sie samt Anhängen endgültig entfernt.')}</p></div>
+          <div className="row"><input type="number" min={1} max={3650} className="input" style={{ maxWidth: 140 }} value={s.trashDays ?? 30} onChange={(e) => set('trashDays', Number(e.target.value))} aria-label={tr('Aufbewahrung in Tagen')} /> <span className="muted">{tr('Tage')}</span></div>
+        </section>
       </div>
     </>
   );

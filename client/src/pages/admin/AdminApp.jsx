@@ -17,12 +17,13 @@ import Notify from './Notify.jsx';
 import Backup from './Backup.jsx';
 import Links from './Links.jsx';
 import Shares from './Shares.jsx';
+import Schemas from './Schemas.jsx';
 import { tr } from '../../lib/i18n.js';
 
 const NAV = [
   ['Übersicht', [['', 'gauge', 'Systemstatus']]],
   ['Zugriff', [['users', 'users', 'Benutzer'], ['groups', 'user-cog', 'Gruppen'], ['spaces', 'shield', 'Bereiche & Rechte'], ['auth', 'fingerprint', 'Anmeldung & Sicherheit']]],
-  ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['tags', 'tags', 'Tags'], ['links', 'unlink', 'Link-Prüfung'], ['shares', 'share', 'Freigabelinks'], ['import', 'download', 'Import']]],
+  ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['schemas', 'table', 'Datenblätter'], ['tags', 'tags', 'Tags'], ['links', 'unlink', 'Link-Prüfung'], ['shares', 'share', 'Freigabelinks'], ['import', 'download', 'Import']]],
   ['System', [['branding', 'palette', 'Branding & Theming'], ['notify', 'bell', 'Benachrichtigungen'], ['backup', 'archive', 'Sicherung & Export'], ['audit', 'scroll', 'Audit-Log'], ['system', 'server-cog', 'Wartung']]],
 ];
 
@@ -77,6 +78,7 @@ export default function AdminApp() {
             <Route path="backup" element={<Backup />} />
             <Route path="links" element={<Links />} />
             <Route path="shares" element={<Shares />} />
+            <Route path="schemas" element={<Schemas />} />
           </Routes>
         </main>
       </div>

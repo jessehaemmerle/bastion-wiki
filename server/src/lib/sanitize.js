@@ -16,7 +16,7 @@ const OPTIONS = {
     'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'colgroup', 'col', 'details', 'summary',
   ],
   allowedAttributes: {
-    '*': ['data-type', 'data-variant', 'data-checked', 'data-language', 'data-id', 'data-color', 'data-secret-id', 'data-label', 'style', 'id'],
+    '*': ['data-type', 'data-variant', 'data-checked', 'data-language', 'data-id', 'data-color', 'data-secret-id', 'data-label', 'data-snippet-id', 'style', 'id'],
     a: ['href', 'title', 'target', 'rel'],
     img: ['src', 'alt', 'title', 'width', 'height'],
     code: ['class'],

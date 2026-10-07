@@ -32,7 +32,7 @@ export const SlashCommand = Extension.create({
           const $from = state.doc.resolve(range.from);
           return $from.parent.type.name !== 'codeBlock';
         },
-        items: ({ query }) => filterSlashItems(query),
+        items: ({ query }) => filterSlashItems(query, ctx),
         command: ({ editor, range, props }) => {
           editor.chain().focus().deleteRange(range).run();
           props.run(editor, ctx);

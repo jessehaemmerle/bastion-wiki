@@ -20,10 +20,11 @@ const uploadDir = path.join(config.dataDir, 'uploads');
 
 // parents before children (foreign keys)
 const TABLES = [
-  'users', 'groups', 'group_members', 'spaces', 'space_permissions', 'pages', 'page_revisions', 'favorites',
+  'users', 'groups', 'group_members', 'spaces', 'space_permissions', 'sheet_schemas', 'pages', 'page_revisions', 'favorites',
   'tags', 'page_tags', 'attachments', 'templates', 'settings', 'audit_log', 'api_tokens', 'import_jobs',
   'page_secrets', 'runbook_runs', 'page_links', 'link_checks', 'watches', 'notifications', 'webhooks',
-  'share_links', 'page_views',
+  'share_links', 'page_views', 'snippets', 'page_permissions', 'page_trash', 'comments',
+  'change_requests', 'expiry_notified',
 ];
 
 const NAME = /^(auto|manual|upload)-[0-9TZ-]+\.tar\.gz$/;
@@ -45,7 +46,7 @@ export async function createBackup(kind = 'manual') {
     await fs.mkdir(path.join(work, 'db'));
     const counts = {};
     for (const t of TABLES) {
-      const rows = await many(`SELECT * FROM ${t}`);
+      const rows = await many(`SELECT * FROM ${t} ORDER BY 1`); // parents first (e.g. comment threads)
       // generated columns cannot be inserted back
       const generated = (await columnsOf(t)).filter((c) => c.is_generated === 'ALWAYS').map((c) => c.column_name);
       for (const r of rows) for (const g of generated) delete r[g];

@@ -9,6 +9,7 @@ import { audit } from '../lib/audit.js';
 import { getSection } from '../lib/integrations.js';
 import { getSettings } from '../lib/settings.js';
 import { uploadDir } from './attachments.js';
+import { expandSnippets } from '../lib/snippets.js';
 
 /**
  * Read-only share links with an expiry date – for external contractors or the on-call
@@ -95,7 +96,7 @@ publicRouter.get('/public/share/:token', async (req, res) => {
     expiresAt: share.expires_at,
     page: {
       title: page.title, icon: page.icon, pageType: page.page_type, properties: page.properties,
-      content: page.content.replace(/\/api\/attachments\/(\d+)/g, `${base}$1`),
+      content: (await expandSnippets(page.content)).replace(/\/api\/attachments\/(\d+)/g, `${base}$1`),
       updatedAt: page.updated_at, updatedBy: page.updated_by_name, spaceName: page.space_name, version: page.version, tags,
       attachments: attachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mime_type, size: a.size_bytes, url: `${base}${a.id}` })),
     },

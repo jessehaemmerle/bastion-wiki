@@ -24,7 +24,8 @@ async function loadSecret(user, id, min) {
     [id],
   );
   if (!s) throw notFound('Geheimnis nicht gefunden');
-  const access = await spaceAccess(user, s.space_id);
+  // attached secrets follow the page (incl. page restrictions), unattached ones the space
+  const access = s.page_id ? (await one('SELECT page_access($1,$2) AS l', [s.page_id, user.id])).l : await spaceAccess(user, s.space_id);
   if (access < LEVEL.read) throw notFound('Geheimnis nicht gefunden');
   if (access < min) throw forbidden('Zum Anzeigen von Geheimnissen sind Schreibrechte im Bereich nötig');
   return { ...s, access };
@@ -65,11 +66,26 @@ router.post('/secrets/lookup', async (req, res) => {
   const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x) => ID.test(String(x))).slice(0, 200);
   if (!ids.length) return res.json({ secrets: [] });
   const rows = await many(
-    `SELECT ps.*, u.display_name AS updated_by_name, space_access(ps.space_id, $2) AS access
+    `SELECT ps.*, u.display_name AS updated_by_name, (CASE WHEN ps.page_id IS NULL THEN space_access(ps.space_id, $2) ELSE page_access(ps.page_id, $2) END) AS access
        FROM page_secrets ps LEFT JOIN users u ON u.id=ps.updated_by WHERE ps.id = ANY($1)`,
     [ids, req.user.id],
   );
   res.json({ secrets: rows.filter((r) => r.access >= LEVEL.read).map(meta) });
+});
+
+/** Several values at once (emergency handbook). Only what the user may reveal; every value is audited. */
+router.post('/secrets/reveal-batch', async (req, res) => {
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter((x) => ID.test(String(x))).slice(0, 500);
+  const purpose = String(req.body?.purpose || '').slice(0, 60);
+  const values = {};
+  for (const id of ids) {
+    try {
+      const s = await loadSecret(req.user, id, LEVEL.write);
+      values[id] = decrypt(s.ciphertext);
+      await audit(req, 'secret.reveal', 'secret', s.id, { label: s.label, page: s.page_id, pageTitle: s.page_title, purpose });
+    } catch { /* not allowed or not decryptable – stays hidden */ }
+  }
+  res.json({ values });
 });
 
 router.post('/secrets/:id/reveal', async (req, res) => {

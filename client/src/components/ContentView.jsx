@@ -7,7 +7,7 @@ import { tr } from '../lib/i18n.js';
 import { renderMermaid } from '../lib/mermaid.js';
 
 const PURIFY = {
-  ADD_ATTR: ['data-type', 'data-variant', 'data-checked', 'data-language', 'data-secret-id', 'data-label', 'target', 'colwidth'],
+  ADD_ATTR: ['data-type', 'data-variant', 'data-checked', 'data-language', 'data-secret-id', 'data-snippet-id', 'data-label', 'target', 'colwidth'],
   RETURN_DOM_FRAGMENT: true,
 };
 
@@ -62,7 +62,7 @@ function highlight(code, text) {
 }
 
 /** Secret block: label + masked value, reveal and copy on demand (every reveal is audited server-side) */
-function secretWidget(el, mode) {
+function secretWidget(el, mode, values) {
   const id = el.dataset.secretId;
   const label = el.dataset.label || tr('Geheimnis');
   el.replaceChildren();
@@ -77,6 +77,11 @@ function secretWidget(el, mode) {
   value.textContent = '••••••••••••';
   head.append(name, value);
   el.append(head);
+  if (mode === 'values') {
+    // printed handbook: value in clear text (already revealed and audited)
+    if (values?.[id] != null) { value.textContent = values[id]; el.classList.add('revealed'); } else value.textContent = tr('(nicht freigegeben)');
+    return;
+  }
   if (mode === 'hidden' || !id) {
     const note = document.createElement('span');
     note.className = 'secret-note';
@@ -132,7 +137,7 @@ function secretWidget(el, mode) {
  * then enhances it: syntax highlighting, copy buttons, heading anchors, task toggles,
  * secret blocks, Mermaid diagrams and {{placeholders}} in code.
  */
-export default function ContentView({ html, onHeadings, onToggleTask, onVariables, variables, secretMode = 'reveal', className = '' }) {
+export default function ContentView({ html, onHeadings, onToggleTask, onVariables, variables, secretMode = 'reveal', secretValues, snippets, className = '' }) {
   const ref = useRef(null);
   const toggleRef = useRef(onToggleTask);
   toggleRef.current = onToggleTask;
@@ -146,6 +151,22 @@ export default function ContentView({ html, onHeadings, onToggleTask, onVariable
     if (!root) return undefined;
     let cancelled = false;
     root.replaceChildren(DOMPurify.sanitize(html || '', PURIFY));
+
+    // snippets: references → current snippet content
+    root.querySelectorAll('div[data-type="snippet"]').forEach((el) => {
+      const sn = snippets?.[el.dataset.snippetId];
+      const box = document.createElement('div');
+      box.className = 'snippet-content';
+      if (sn) {
+        box.dataset.snippet = sn.name;
+        box.title = tr('Baustein: {name}', { name: sn.name });
+        box.append(DOMPurify.sanitize(sn.content, PURIFY));
+      } else {
+        box.classList.add('missing');
+        box.textContent = tr('Baustein nicht gefunden (gelöscht?)');
+      }
+      el.replaceWith(box);
+    });
 
     // headings → ids + anchors for the TOC
     const used = new Set();
@@ -166,7 +187,7 @@ export default function ContentView({ html, onHeadings, onToggleTask, onVariable
     onHeadings?.(headings);
 
     // secrets
-    root.querySelectorAll('div[data-type="secret"]').forEach((el) => secretWidget(el, secretMode));
+    root.querySelectorAll('div[data-type="secret"]').forEach((el) => secretWidget(el, secretMode, secretValues));
 
     // code blocks
     const varNames = new Set();
@@ -253,7 +274,7 @@ export default function ContentView({ html, onHeadings, onToggleTask, onVariable
       });
     });
     return () => { cancelled = true; };
-  }, [html, onHeadings, secretMode]);
+  }, [html, onHeadings, secretMode, secretValues, snippets]);
 
   // placeholder values changed → refill only the affected code blocks
   useEffect(() => {

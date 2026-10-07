@@ -3,12 +3,14 @@ import { decrypt } from './crypto.js';
 import { getSection, publicBase } from './integrations.js';
 import { mailEnabled, renderMail, sendMail } from './mail.js';
 import { getSettings } from './settings.js';
+import { isRestricted } from './permissions.js';
+import { expiringFor } from './schemas.js';
 
 /**
  * Notifications: in-app inbox, e-mail digests and webhooks (Slack, Teams, Matrix, Discord, generic JSON).
  * Events: page.create, page.update, page.delete, review.due, run.finish
  */
-export const EVENTS = ['page.create', 'page.update', 'page.delete', 'review.due', 'run.finish'];
+export const EVENTS = ['page.create', 'page.update', 'page.delete', 'review.due', 'run.finish', 'comment.create', 'expiry.due', 'approval.request', 'approval.decision'];
 
 const TEXT = {
   de: {
@@ -17,6 +19,13 @@ const TEXT = {
     'page.delete': '{actor} hat „{title}“ gelöscht',
     'review.due': 'Review fällig: „{title}“',
     'run.finish': '{actor} hat „{title}“ ausgeführt ({status})',
+    'comment.create': '{actor} hat „{title}“ kommentiert',
+    'comment.mention': '{actor} hat dich in „{title}“ erwähnt',
+    'expiry.due': '„{field}“ von „{title}“ läuft am {due} ab',
+    'approval.request': '{actor} bittet um Freigabe für „{title}“',
+    'approval.decision': '{actor} hat deine Änderung an „{title}“ {status}',
+    approved: 'freigegeben',
+    rejected: 'abgelehnt',
     done: 'abgeschlossen',
     aborted: 'abgebrochen',
     someone: 'Jemand',
@@ -33,6 +42,13 @@ const TEXT = {
     'page.delete': '{actor} deleted “{title}”',
     'review.due': 'Review due: “{title}”',
     'run.finish': '{actor} ran “{title}” ({status})',
+    'comment.create': '{actor} commented on “{title}”',
+    'comment.mention': '{actor} mentioned you in “{title}”',
+    'expiry.due': '“{field}” of “{title}” expires on {due}',
+    'approval.request': '{actor} asks for approval of “{title}”',
+    'approval.decision': '{actor} {status} your change to “{title}”',
+    approved: 'approved',
+    rejected: 'rejected',
     done: 'completed',
     aborted: 'aborted',
     someone: 'Someone',
@@ -48,7 +64,7 @@ const t = (lang, key, vars = {}) => (TEXT[lang]?.[key] ?? TEXT.de[key] ?? key).r
 
 export function eventText(lang, kind, data) {
   const status = data.status ? t(lang, data.status) : '';
-  return t(lang, kind, { actor: data.actor || t(lang, 'someone'), title: data.title || '', status });
+  return t(lang, kind, { actor: data.actor || t(lang, 'someone'), title: data.title || '', status, field: data.field || '', due: data.due || '' });
 }
 
 // ------------------------------------------------------------------ in-app + recipients
@@ -57,7 +73,8 @@ export function eventText(lang, kind, data) {
  * Records an event for watchers and fires webhooks. Never throws – notifications must not break saving.
  * page: { id, title, space_id, space_key?, space_name? } (for deletions a snapshot)
  */
-export async function notifyPageEvent(kind, page, actor, extra = {}) {
+export async function notifyPageEvent(kind, page, actor, extraIn = {}) {
+  const { skipUsers = [], ...extra } = extraIn;
   try {
     const space = page.space_key ? { key: page.space_key, name: page.space_name } : await one('SELECT key, name FROM spaces WHERE id=$1', [page.space_id]);
     const data = { title: page.title, actor: actor?.display_name || null, spaceKey: space?.key, spaceName: space?.name, ...extra };
@@ -66,12 +83,13 @@ export async function notifyPageEvent(kind, page, actor, extra = {}) {
     const recipients = await many(
       `SELECT DISTINCT u.id FROM users u
         WHERE u.is_active AND u.id IS DISTINCT FROM $3
-          AND space_access($2, u.id) >= 1
+          AND (CASE WHEN EXISTS (SELECT 1 FROM pages WHERE id=$1) THEN page_access($1, u.id) ELSE space_access($2, u.id) END) >= 1
           AND (EXISTS (SELECT 1 FROM watches w WHERE w.user_id=u.id AND (w.page_id=$1 OR w.space_id=$2))
                OR ($4 AND u.id IN (SELECT created_by FROM pages WHERE id=$1 UNION SELECT updated_by FROM pages WHERE id=$1)))`,
-      [page.id, page.space_id, actor?.id ?? null, kind === 'review.due'],
+      [page.id, page.space_id, actor?.id ?? null, kind === 'review.due' || kind === 'expiry.due'],
     );
     for (const r of recipients) {
+      if (skipUsers.includes(r.id)) continue;
       // a burst of edits becomes one entry
       if (kind === 'page.update') {
         const bumped = await query(
@@ -87,7 +105,23 @@ export async function notifyPageEvent(kind, page, actor, extra = {}) {
         [r.id, kind, alive ? page.id : null, actor?.id ?? null, data],
       );
     }
-    await deliverWebhooks(kind, { ...data, pageId: alive ? page.id : null, spaceId: page.space_id });
+    await deliverWebhooks(kind, { ...data, pageId: alive ? page.id : null, spaceId: page.space_id, restrictedPageId: alive ? page.id : null });
+  } catch (err) {
+    console.error('[notify]', err.message);
+  }
+}
+
+/** Direct notification to specific people (mentions, approvals) – only those who can read the page */
+export async function notifyUsers(userIds, kind, page, actor, extra = {}) {
+  try {
+    const ids = [...new Set(userIds)].filter((id) => id && id !== actor?.id);
+    if (!ids.length) return;
+    const space = await one('SELECT key, name FROM spaces WHERE id=$1', [page.space_id]);
+    const data = { title: page.title, actor: actor?.display_name || null, spaceKey: space?.key, spaceName: space?.name, ...extra };
+    const allowed = await many('SELECT id FROM users WHERE id = ANY($1) AND is_active AND page_access($2, id) >= 1', [ids, page.id]);
+    for (const u of allowed) {
+      await query('INSERT INTO notifications (user_id, kind, page_id, actor_id, data) VALUES ($1,$2,$3,$4,$5)', [u.id, kind, page.id, actor?.id ?? null, data]);
+    }
   } catch (err) {
     console.error('[notify]', err.message);
   }
@@ -145,6 +179,8 @@ async function postHook(hook, body) {
 }
 
 export async function deliverWebhooks(kind, data) {
+  // restricted pages stay out of chat channels – titles can be sensitive too
+  if (data.restrictedPageId && await isRestricted(data.restrictedPageId)) return;
   const hooks = await many(
     `SELECT * FROM webhooks WHERE is_active AND $1 = ANY(events) AND (cardinality(space_ids)=0 OR $2 = ANY(space_ids))`,
     [kind, data.spaceId ?? 0],
@@ -230,4 +266,17 @@ export async function checkReviews() {
     await query('UPDATE pages SET review_notified=current_date WHERE id=$1', [p.id]);
   }
   return pages.length;
+}
+
+/** Expiry dates inside their reminder window → one notification per page, field and date */
+export async function checkExpiry() {
+  let sent = 0;
+  for (const it of await expiringFor(null, 3650)) {
+    if (it.daysLeft > it.leadDays) continue;
+    const ins = await query('INSERT INTO expiry_notified (page_id, field, due) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', [it.pageId, it.field, it.due]);
+    if (!ins.rowCount) continue;
+    await notifyPageEvent('expiry.due', { id: it.pageId, title: it.title, space_id: it.spaceId, space_key: it.spaceKey, space_name: it.spaceName }, null, { field: it.field, due: it.due });
+    sent++;
+  }
+  return sent;
 }

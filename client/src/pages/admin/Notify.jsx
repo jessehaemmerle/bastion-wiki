@@ -21,6 +21,10 @@ const EVENT_LABEL = {
   get 'page.delete'() { return tr('Seite gelöscht'); },
   get 'review.due'() { return tr('Review fällig'); },
   get 'run.finish'() { return tr('Durchlauf beendet'); },
+  get 'comment.create'() { return tr('Kommentar'); },
+  get 'expiry.due'() { return tr('Frist läuft ab'); },
+  get 'approval.request'() { return tr('Freigabe angefragt'); },
+  get 'approval.decision'() { return tr('Freigabe entschieden'); },
 };
 
 function Smtp({ sec }) {

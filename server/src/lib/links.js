@@ -57,7 +57,7 @@ export async function ensureLinkIndex(force = false) {
 export const backlinks = (pageId, userId) => many(
   `SELECT DISTINCT p.id, p.title, p.icon, p.page_type, s.key AS space_key, s.name AS space_name, s.color AS space_color
      FROM page_links l JOIN pages p ON p.id=l.source_id JOIN spaces s ON s.id=p.space_id
-    WHERE l.kind='page' AND l.target_id=$1 AND l.source_id<>$1 AND space_access(p.space_id,$2) >= 1
+    WHERE l.kind='page' AND l.target_id=$1 AND l.source_id<>$1 AND page_access(p.id,$2) >= 1
     ORDER BY p.title`,
   [pageId, userId],
 );

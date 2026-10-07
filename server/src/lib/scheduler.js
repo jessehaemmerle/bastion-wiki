@@ -1,4 +1,6 @@
-import { checkReviews, sendDigests } from './notify.js';
+import { checkExpiry, checkReviews, sendDigests } from './notify.js';
+import { purgeExpiredTrash } from './trash.js';
+import { getSettings } from './settings.js';
 import { createBackup, pruneBackups } from './backup.js';
 import { syncGit } from './gitsync.js';
 import { getSection } from './integrations.js';
@@ -45,6 +47,8 @@ async function minutely() {
 
 async function hourly() {
   await once('reviews', checkReviews);
+  await once('expiry', checkExpiry);
+  await once('trash', async () => purgeExpiredTrash((await getSettings()).trashDays));
   await once('cleanup', async () => {
     await query('DELETE FROM sessions WHERE expires_at < now()');
     await query("DELETE FROM notifications WHERE created_at < now() - interval '90 days'");

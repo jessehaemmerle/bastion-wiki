@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '../../components/Icon.jsx';
 import Editor from '../../components/editor/Editor.jsx';
 import { PropertiesEditor, TagInput } from '../../components/PageFields.jsx';
@@ -14,13 +14,16 @@ function TemplateModal({ template, onClose, onSaved }) {
   const [f, setF] = useState({
     name: template?.name || '', description: template?.description || '', icon: template?.icon || 'file-text',
     pageType: template?.pageType || 'doc', content: template?.content || '', properties: template?.properties || {}, tags: template?.tags || [],
-    language: template ? template.language || '' : '',
+    language: template ? template.language || '' : '', schemaId: template?.schemaId || '',
   });
+  const [schemas, setSchemas] = useState([]);
+  useEffect(() => { api.get('/schemas').then((d) => setSchemas(d.schemas)).catch(() => {}); }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     try {
-      if (template) await api.put(`/templates/${template.id}`, f);
-      else await api.post('/templates', f);
+      const body = { ...f, schemaId: f.schemaId ? Number(f.schemaId) : null };
+      if (template) await api.put(`/templates/${template.id}`, body);
+      else await api.post('/templates', body);
       toast(tr('Vorlage gespeichert'));
       onSaved();
       onClose();
@@ -48,6 +51,14 @@ function TemplateModal({ template, onClose, onSaved }) {
       <div className="field"><label>{tr('Beschreibung')}</label><input className="input" value={f.description} onChange={(e) => set('description', e.target.value)} /></div>
       <div className="field"><label>{tr('Symbol')}</label><IconPicker value={f.icon} onChange={(i) => set('icon', i)} /></div>
       <div className="field"><label>{tr('Standard-Tags')}</label><TagInput value={f.tags} onChange={(t) => set('tags', t)} /></div>
+      <div className="field">
+        <label htmlFor="tpl-schema">{tr('Datenblatt-Schema')}</label>
+        <select id="tpl-schema" className="select" value={f.schemaId} onChange={(e) => set('schemaId', e.target.value)}>
+          <option value="">{tr('Freie Felder (ohne Schema)')}</option>
+          {schemas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+        <span className="hint">{tr('Neue Seiten aus dieser Vorlage verwenden das Schema – änderbar pro Seite.')}</span>
+      </div>
       <div className="field"><label>{tr('Standard-Eigenschaften')}</label><PropertiesEditor value={f.properties} onChange={(p) => set('properties', p)} /></div>
       <div className="field"><label>{tr('Inhalt')}</label><Editor content={f.content} onChange={(html) => set('content', html)} /></div>
     </Modal>

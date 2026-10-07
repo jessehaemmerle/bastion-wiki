@@ -10,6 +10,7 @@ import { DEFAULT_SETTINGS, getSettings, updateSettings } from '../lib/settings.j
 import { mapSpace } from './spaces.js';
 import { uploadDir } from './attachments.js';
 import { ensureLinkIndex } from '../lib/links.js';
+import { trashedFiles } from '../lib/trash.js';
 
 const router = Router();
 router.use('/admin', requireRole('admin'));
@@ -267,6 +268,7 @@ router.put('/admin/settings', async (req, res) => {
     allowRegistration: { type: 'bool' },
     defaultRole: { type: 'string', enum: ['editor', 'viewer'] },
     reviewIntervalDays: { type: 'int' },
+    trashDays: { type: 'int' },
     announcement: { type: 'string', max: 500 },
     customCss: { type: 'string', trim: false, max: 50000 },
     footerText: { type: 'string', max: 200 },
@@ -309,7 +311,7 @@ router.post('/admin/maintenance/:task', async (req, res) => {
   } else if (task === 'purge-tags') {
     result = (await query('DELETE FROM tags t WHERE NOT EXISTS (SELECT 1 FROM page_tags pt WHERE pt.tag_id=t.id)')).rowCount;
   } else if (task === 'purge-orphans') {
-    const known = new Set((await many('SELECT stored_name FROM attachments')).map((r) => r.stored_name));
+    const known = new Set([...(await many('SELECT stored_name FROM attachments')).map((r) => r.stored_name), ...(await trashedFiles())]);
     const files = await fs.readdir(uploadDir);
     let n = 0;
     for (const f of files) if (!known.has(f)) { await fs.rm(path.join(uploadDir, f), { force: true }); n++; }

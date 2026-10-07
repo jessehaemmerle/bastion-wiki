@@ -157,7 +157,7 @@ router.delete('/runs/:id', async (req, res) => {
 router.get('/runs', async (req, res) => {
   const rows = await many(
     `${RUN_SELECT} JOIN pages p ON p.id=r.page_id
-      WHERE space_access(p.space_id,$1) >= 1 AND ($2 = '' OR r.status = $2)
+      WHERE page_access(p.id,$1) >= 1 AND ($2 = '' OR r.status = $2)
       ORDER BY r.status='running' DESC, r.started_at DESC LIMIT 30`,
     [req.user.id, String(req.query.status || '')],
   );

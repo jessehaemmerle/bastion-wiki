@@ -13,7 +13,7 @@ router.get('/tags', async (req, res) => {
     `SELECT t.id, t.name, t.color, count(p.id)::int AS count, max(p.updated_at) AS last_used
        FROM tags t
        LEFT JOIN page_tags pt ON pt.tag_id = t.id
-       LEFT JOIN pages p ON p.id = pt.page_id AND space_access(p.space_id, $1) >= 1
+       LEFT JOIN pages p ON p.id = pt.page_id AND page_access(p.id, $1) >= 1
       GROUP BY t.id
      HAVING count(p.id) > 0 OR $2::boolean
       ORDER BY count(p.id) DESC, t.name`,
@@ -29,7 +29,7 @@ router.get('/tags/:name', async (req, res) => {
     `SELECT t2.name, t2.color, count(*)::int AS count
        FROM page_tags a JOIN page_tags b ON a.page_id=b.page_id AND b.tag_id<>a.tag_id
        JOIN tags t2 ON t2.id=b.tag_id JOIN pages p ON p.id=a.page_id
-      WHERE a.tag_id=$1 AND space_access(p.space_id,$2) >= 1
+      WHERE a.tag_id=$1 AND page_access(p.id,$2) >= 1
       GROUP BY t2.id ORDER BY count DESC LIMIT 12`,
     [tag.id, req.user.id],
   );

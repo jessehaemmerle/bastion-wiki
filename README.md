@@ -12,7 +12,13 @@ installierbar – inklusive Offline-Lesen zuletzt besuchter Seiten.
 | --- | --- |
 | **Editor** | WYSIWYG (TipTap) mit Slash-Menü (`/`), Codeblöcken mit Syntax-Highlighting für Bash, PowerShell, YAML, Nginx, Dockerfile, SQL u. v. m., Callouts (Info/Tipp/Warnung/Gefahr/Erfolg), Checklisten, Tabellen, Bildern per Drag & Drop/Einfügen, Bubble-Menü, `Strg+S` zum Speichern, lokale Entwurfssicherung |
 | **Bereiche** | Beliebig viele Bereiche (Spaces) mit eigener Farbe, eigenem Symbol und eigenen Rechten; hierarchischer Seitenbaum mit Drag & Drop |
-| **Berechtigungen** | Globale Rollen (Administrator, Redakteur, Betrachter) + pro Bereich: Standardzugriff (kein/lesen/schreiben) und explizite Rechte für Personen und Gruppen (Lesen/Schreiben/Verwalten) |
+| **Berechtigungen** | Globale Rollen (Administrator, Redakteur, Betrachter) + pro Bereich: Standardzugriff (kein/lesen/schreiben) und explizite Rechte für Personen und Gruppen (Lesen/Schreiben/Verwalten) + **Einschränkung pro Seite** (gilt auch für Unterseiten; Verwalter des Bereichs behalten immer Zugriff) |
+| **Freigabe-Workflow** | Pro Seite zuschaltbar: Änderungen werden zum Änderungsvorschlag, eine zweite Person (oder eine festgelegte Gruppe) gibt frei oder lehnt ab – mit Diff, Anmerkung und Benachrichtigung (Vier-Augen-Prinzip) |
+| **Kommentare** | Diskussionen pro Seite mit Antworten, **@Erwähnungen** (Benachrichtigung nur an Personen mit Zugriff) und „erledigt“ |
+| **Datenblätter** | Optional pro Seite ein **Schema** mit typisierten Feldern (Text, Zahl, Datum, Auswahl, URL, IP, E-Mail, Ja/Nein), Pflichtfeldern und **Ablaufdaten** – Übersicht „Fristen“ und Erinnerungen vor Ablauf (Zertifikate, Lizenzen, Verträge, Garantien) |
+| **Bausteine** | Wiederverwendbare Textblöcke, an einer Stelle gepflegt und auf beliebig vielen Seiten eingefügt (auch in Exporten und Freigabelinks) |
+| **Papierkorb** | Gelöschte Seiten samt Versionen, Anhängen, Kommentaren und Geheimnissen wiederherstellbar (Standard 30 Tage, einstellbar) |
+| **Notfallhandbuch** | Ausgewählte Bereiche als druckfertiges Dokument mit Deckblatt, Inhaltsverzeichnis, Datenblättern und Diagrammen – „Als PDF speichern“; Geheimnisse optional im Klartext (protokolliert) |
 | **Nutzermanagement** | Benutzer, Gruppen, Deaktivieren, Passwort-Reset, Sitzungen beenden, optionale Selbstregistrierung |
 | **Anmeldung** | Lokale Konten, **LDAP / Active Directory** (Dienstkonto, Filter, memberOf oder Gruppensuche, eigene CA) und **OpenID Connect** (Entra ID, Keycloak, Authentik, Okta … mit PKCE). Rollen und Wiki-Gruppen werden aus Verzeichnis- bzw. SSO-Gruppen abgeleitet und bei jeder Anmeldung abgeglichen. **Zwei-Faktor-Anmeldung (TOTP)** mit Wiederherstellungscodes, auf Wunsch für Admins oder alle vorgeschrieben |
 | **Suche** | Systemweite Volltextsuche (PostgreSQL `tsvector` + Trigramm-Ähnlichkeit) über Titel, Inhalt **und Eigenschaften** (z. B. IP-Adressen); Filter `tag:`, `space:`, `type:`, `#tag`; Befehlspalette mit `Strg+K` |
@@ -129,10 +135,14 @@ angelegt – damit lassen sich Importe auch wiederholen. API-Zugangsdaten werden
 2. **Standardzugriff des Bereichs** gilt für alle angemeldeten Personen.
 3. **Explizite Rechte** für Personen oder Gruppen (Lesen / Schreiben / Verwalten).
 
-Es gilt jeweils die höchste Stufe aus 2 und 3, begrenzt durch 1. Wer einen Bereich
-anlegt, erhält automatisch „Verwalten“. Die Prüfung erfolgt serverseitig in der
-SQL-Funktion `space_access()`, damit Listen, Suche und Dashboard nie Inhalte
-ohne Zugriff zeigen.
+4. **Einschränkung der Seite** (optional): Ist eine Seite oder eine übergeordnete Seite eingeschränkt,
+   sehen sie nur die dort eingetragenen Personen und Gruppen – höchstens mit dem Recht, das der Bereich gibt.
+   Verwalter des Bereichs und Administratoren behalten immer Zugriff.
+
+Es gilt jeweils die höchste Stufe aus 2 und 3, begrenzt durch 1 und 4. Wer einen Bereich
+anlegt, erhält automatisch „Verwalten“. Die Prüfung erfolgt serverseitig in den
+SQL-Funktionen `space_access()` und `page_access()`, damit Listen, Suche, Seitenbaum,
+Benachrichtigungen und Dashboard nie Inhalte ohne Zugriff zeigen.
 
 ## REST-API
 
@@ -158,6 +168,8 @@ Wichtige Endpunkte: `GET /api/spaces`, `GET /api/spaces/:key`, `GET|POST /api/pa
 `GET|PUT|DELETE /api/pages/:id`, `POST /api/pages/:id/move`, `GET /api/pages/:id/revisions`,
 `POST /api/pages/:id/attachments`, `GET /api/tags`, `GET /api/search`, `GET /api/inventory?type=host`,
 `GET /api/pages/:id/related`, `GET|POST /api/pages/:id/runs`, `PATCH /api/runs/:id`, `GET /api/notifications`,
+`GET|POST /api/pages/:id/comments`, `GET|PUT /api/pages/:id/permissions`, `PUT /api/pages/:id/approval`,
+`POST /api/change-requests/:id/approve|reject`, `GET /api/expiring`, `GET /api/snippets`, `GET /api/trash`, `GET /api/handbook`,
 `GET /api/health`, `GET /metrics` (Prometheus).
 
 ## Backup & Wiederherstellung

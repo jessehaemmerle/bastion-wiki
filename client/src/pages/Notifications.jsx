@@ -7,7 +7,10 @@ import { useChrome, useFetch } from '../lib/hooks.js';
 import { formatDate, timeAgo } from '../lib/format.js';
 import { tr } from '../lib/i18n.js';
 
-const ICON = { 'page.create': 'plus', 'page.update': 'pen', 'page.delete': 'trash', 'review.due': 'calendar-clock', 'run.finish': 'play' };
+const ICON = {
+  'page.create': 'plus', 'page.update': 'pen', 'page.delete': 'trash', 'review.due': 'calendar-clock', 'run.finish': 'play',
+  'comment.create': 'message', 'comment.mention': 'message', 'expiry.due': 'calendar', 'approval.request': 'git-pull-request', 'approval.decision': 'badge-check',
+};
 
 export function notificationText(n) {
   const v = { actor: n.data.actor || tr('Jemand'), title: n.title || n.data.title || '' };
@@ -18,6 +21,13 @@ export function notificationText(n) {
       : tr('{actor} hat „{title}“ geändert', v);
     case 'page.delete': return tr('{actor} hat „{title}“ gelöscht', v);
     case 'review.due': return tr('Review fällig: „{title}“', v);
+    case 'comment.create': return tr('{actor} hat „{title}“ kommentiert', v);
+    case 'comment.mention': return tr('{actor} hat dich in „{title}“ erwähnt', v);
+    case 'expiry.due': return tr('„{field}“ von „{title}“ läuft am {date} ab', { ...v, field: n.data.field, date: formatDate(n.data.due) });
+    case 'approval.request': return tr('{actor} bittet um Freigabe für „{title}“', v);
+    case 'approval.decision': return n.data.status === 'approved'
+      ? tr('{actor} hat deine Änderung an „{title}“ freigegeben', v)
+      : tr('{actor} hat deine Änderung an „{title}“ abgelehnt', v);
     case 'run.finish': return n.data.status === 'aborted'
       ? tr('{actor} hat einen Durchlauf von „{title}“ abgebrochen', v)
       : tr('{actor} hat „{title}“ ausgeführt', v);
@@ -44,6 +54,7 @@ export default function Notifications() {
       setUnread((u) => Math.max(0, u - 1));
     }
     if (n.kind === 'run.finish' && n.data.runId) navigate(`/runs/${n.data.runId}`);
+    else if (n.kind.startsWith('comment.') && n.pageId) navigate(`/p/${n.pageId}#comment-${n.data.commentId}`);
     else if (n.pageId) navigate(`/p/${n.pageId}`);
     else setData((d) => ({ ...d, notifications: d.notifications.map((x) => (x.id === n.id ? { ...x, read: true } : x)) }));
   };
@@ -74,6 +85,8 @@ export default function Notifications() {
                   <span className="inbox-meta">
                     {n.data.spaceName && <span>{n.data.spaceName}</span>}
                     {n.data.summary && <span>„{n.data.summary}“</span>}
+                    {n.data.excerpt && <span>„{n.data.excerpt}“</span>}
+                    {n.data.note && <span>{tr('Anmerkung: {note}', { note: n.data.note })}</span>}
                     <span title={formatDate(n.createdAt, true)}>{timeAgo(n.createdAt)}</span>
                   </span>
                 </span>

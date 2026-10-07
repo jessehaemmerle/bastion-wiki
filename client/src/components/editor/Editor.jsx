@@ -16,6 +16,7 @@ import { lowlight } from '../../lib/highlight.js';
 import { Callout } from './Callout.js';
 import { SlashCommand } from './SlashCommand.js';
 import { Secret, SecretModal } from './Secret.jsx';
+import { Snippet, SnippetPicker } from './Snippet.jsx';
 import { MERMAID_SAMPLE } from './slashItems.js';
 import CodeBlockView from './CodeBlockView.jsx';
 import Icon from '../Icon.jsx';
@@ -43,7 +44,7 @@ function Btn({ icon, label, active, onClick, disabled, children }) {
   );
 }
 
-function Toolbar({ editor, onPickImage, onSecret }) {
+function Toolbar({ editor, onPickImage, onSecret, onSnippet }) {
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -109,7 +110,8 @@ function Toolbar({ editor, onPickImage, onSecret }) {
       <Btn icon="flame" label={tr('Gefahr')} onClick={() => c().toggleCallout('danger').run()} />
       <Btn icon="grid" label={tr('Tabelle einfügen')} active={s.table} onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
       <Btn icon="upload" label={tr('Bild einfügen')} onClick={onPickImage} />
-      <Btn icon="lock" label={tr('Geheimnis einfügen')} onClick={onSecret} />
+      {onSecret && <Btn icon="lock" label={tr('Geheimnis einfügen')} onClick={onSecret} />}
+      {onSnippet && <Btn icon="layers" label={tr('Baustein einfügen')} onClick={onSnippet} />}
       <Btn icon="waypoints" label={tr('Diagramm (Mermaid)')} onClick={() => c().insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: MERMAID_SAMPLE }] }).run()} />
       <Btn icon="more" label={tr('Trennlinie')} onClick={() => c().setHorizontalRule().run()} />
       <span className="tb-sep" />
@@ -135,10 +137,11 @@ function Toolbar({ editor, onPickImage, onSecret }) {
  * WYSIWYG editor.
  * `onUpload(files)` must return [{ url, filename, mimeType }]. If missing, images are embedded as data URLs.
  */
-export default function Editor({ content, onChange, onUpload, placeholder, onSaveShortcut, secretContext }) {
+export default function Editor({ content, onChange, onUpload, placeholder, onSaveShortcut, secretContext, allowSecrets = true, allowSnippets = true }) {
   const fileRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [secretModal, setSecretModal] = useState(null);
+  const [snippetPicker, setSnippetPicker] = useState(false);
   const uploadRef = useRef(onUpload);
   uploadRef.current = onUpload;
   const saveRef = useRef(onSaveShortcut);
@@ -189,7 +192,14 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
       Superscript,
       Callout,
       Secret,
-      SlashCommand.configure({ context: { pickImage: () => fileRef.current?.click(), newSecret: () => setSecretModal({ mode: 'new' }) } }),
+      Snippet,
+      SlashCommand.configure({
+        context: {
+          pickImage: () => fileRef.current?.click(),
+          newSecret: allowSecrets ? () => setSecretModal({ mode: 'new' }) : undefined,
+          pickSnippet: allowSnippets ? () => setSnippetPicker(true) : undefined,
+        },
+      }),
     ],
     content,
     editorProps: {
@@ -237,7 +247,9 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
       onDragOver={(e) => e.dataTransfer?.types?.includes('Files') && setDragging(true)}
       onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setDragging(false)}
     >
-      <Toolbar editor={editor} onPickImage={() => fileRef.current?.click()} onSecret={() => setSecretModal({ mode: 'new' })} />
+      <Toolbar editor={editor} onPickImage={() => fileRef.current?.click()}
+        onSecret={allowSecrets ? () => setSecretModal({ mode: 'new' }) : undefined}
+        onSnippet={allowSnippets ? () => setSnippetPicker(true) : undefined} />
       <BubbleMenu editor={editor} shouldShow={({ editor: e, state }) => !state.selection.empty && !e.isActive('codeBlock') && !e.isActive('image')}>
         <div className="bubble">
           <Btn label={tr('Fett')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></Btn>
@@ -258,6 +270,7 @@ export default function Editor({ content, onChange, onUpload, placeholder, onSav
         <span>{tr('{n} Wörter', { n: words })}</span>
       </div>
       {dragging && <div className="drop-hint">{tr('Dateien hier ablegen')}</div>}
+      {snippetPicker && <SnippetPicker editor={editor} onClose={() => setSnippetPicker(false)} />}
       {secretModal && <SecretModal state={secretModal} context={secretContext} editor={editor} onClose={() => setSecretModal(null)} />}
       <input
         ref={fileRef}

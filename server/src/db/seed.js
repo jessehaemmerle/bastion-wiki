@@ -1,10 +1,10 @@
-import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { one, query, tx } from './index.js';
 import { hashPassword } from '../lib/auth.js';
 import { htmlToText } from '../lib/sanitize.js';
 import { slugify } from '../lib/http.js';
-import { demoFor, templatesFor } from './seed-content.js';
+import crypto from 'node:crypto';
+import { demoFor, schemasFor, templatesFor } from './seed-content.js';
 
 /** Built-in templates exist once per language; missing languages are added on upgrade. */
 async function seedTemplates() {
@@ -42,6 +42,7 @@ async function seedDemo(admin) {
   if (n > 0 || !config.seedDemo) return;
   const demo = demoFor(config.language);
 
+  const hostSchema = await one("SELECT id FROM sheet_schemas WHERE page_type='host' ORDER BY id LIMIT 1");
   await tx(async (c) => {
     const spaceIds = {};
     let order = 0;
@@ -57,10 +58,10 @@ async function seedDemo(admin) {
     for (const p of demo.pages) {
       const props = p.props || {};
       const { rows } = await c.query(
-        `INSERT INTO pages (space_id, parent_id, title, slug, content, content_text, page_type, properties, review_due, is_pinned, created_by, updated_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11) RETURNING id`,
+        `INSERT INTO pages (space_id, parent_id, title, slug, content, content_text, page_type, properties, review_due, is_pinned, created_by, updated_by, schema_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12) RETURNING id`,
         [spaceIds[p.space], p.parent ? pageIds[p.parent] : null, p.title, slugify(p.title), p.html, htmlToText(p.html), p.type, props,
-          p.reviewDue ?? null, Boolean(p.pinned), admin?.id ?? null],
+          p.reviewDue ?? null, Boolean(p.pinned), admin?.id ?? null, p.type === 'host' ? hostSchema?.id ?? null : null],
       );
       const id = rows[0].id;
       if (p.key) pageIds[p.key] = id;
@@ -80,8 +81,24 @@ async function seedDemo(admin) {
   console.log(`[seed] Beispielinhalte (${config.language}) angelegt`);
 }
 
+/** Example data-sheet schemas – once per installation (a marker keeps deleted ones deleted) */
+async function seedSchemas() {
+  if (await one("SELECT 1 FROM settings WHERE key='seed.schemas'")) return;
+  for (const sc of schemasFor(config.language)) {
+    const fields = sc.fields.map((f) => ({ ...f, id: crypto.randomBytes(6).toString('hex') }));
+    const row = await one(
+      'INSERT INTO sheet_schemas (name, description, page_type, fields) VALUES ($1,$2,$3,$4) ON CONFLICT (name) DO NOTHING RETURNING id',
+      [sc.name, sc.description, sc.page_type, JSON.stringify(fields)],
+    );
+    // built-in host templates fill the typed data sheet from now on
+    if (row && sc.page_type === 'host') await query("UPDATE templates SET schema_id=$1 WHERE is_builtin AND page_type='host' AND language=$2 AND schema_id IS NULL", [row.id, config.language]);
+  }
+  await query(`INSERT INTO settings (key, value) VALUES ('seed.schemas', 'true') ON CONFLICT DO NOTHING`);
+}
+
 export async function bootstrap() {
   const admin = await seedAdmin();
   await seedTemplates();
+  await seedSchemas();
   await seedDemo(admin || (await one(`SELECT * FROM users WHERE role='admin' ORDER BY id LIMIT 1`)));
 }

@@ -53,7 +53,7 @@ router.get('/search', async (req, res) => {
   const tsq = toTsQuery(text);
   const params = [req.user.id];
   const p = (v) => { params.push(v); return `$${params.length}`; };
-  const where = ['space_access(p.space_id, $1) >= 1'];
+  const where = ['page_access(p.id, $1) >= 1'];
 
   let rank = '0';
   let headline = 'left(p.content_text, 200)';
@@ -104,7 +104,7 @@ router.get('/search', async (req, res) => {
       many(
         `SELECT t.name, t.color, count(pt.page_id)::int AS count FROM tags t
            JOIN page_tags pt ON pt.tag_id=t.id JOIN pages p ON p.id=pt.page_id
-          WHERE space_access(p.space_id, $1) >= 1 AND (t.name ILIKE $2 OR similarity(t.name, $3) > 0.3)
+          WHERE page_access(p.id, $1) >= 1 AND (t.name ILIKE $2 OR similarity(t.name, $3) > 0.3)
           GROUP BY t.id ORDER BY count DESC LIMIT 8`,
         [req.user.id, like, text],
       ),

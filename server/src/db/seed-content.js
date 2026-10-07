@@ -272,3 +272,32 @@ ${code('bash', 'sudo sshd -t && sudo systemctl reload ssh')}` },
     ],
   };
 }
+
+/** Data-sheet schemas offered on a fresh install */
+export function schemasFor(lang) {
+  const en = lang === 'en';
+  const f = (label, type = 'text', extra = {}) => ({ label, type, required: false, options: [], expiry: false, leadDays: 30, hint: '', ...extra });
+  return en ? [
+    { name: 'Server / host', page_type: 'host', description: 'Typed data sheet for servers and VMs', fields: [
+      f('Hostname', 'text', { required: true }), f('IP address', 'ip'), f('Operating system'),
+      f('Environment', 'select', { options: ['Production', 'Staging', 'Test', 'Development'] }), f('Location'), f('Owner'),
+      f('Maintenance window'), f('Warranty until', 'date', { expiry: true, leadDays: 60 })] },
+    { name: 'Certificate', page_type: 'service', description: 'TLS certificates with expiry reminder', fields: [
+      f('Common name', 'text', { required: true }), f('Issuer'), f('Valid until', 'date', { required: true, expiry: true, leadDays: 30 }),
+      f('Renewal', 'select', { options: ['automatic (ACME)', 'manual'] }), f('Used on')] },
+    { name: 'Licence / contract', page_type: 'doc', description: 'Licences, support and maintenance contracts', fields: [
+      f('Product', 'text', { required: true }), f('Vendor'), f('Contract number'), f('Runs until', 'date', { expiry: true, leadDays: 90 }),
+      f('Notice period'), f('Contact', 'email')] },
+  ] : [
+    { name: 'Server / Host', page_type: 'host', description: 'Typisiertes Datenblatt für Server und VMs', fields: [
+      f('Hostname', 'text', { required: true }), f('IP-Adresse', 'ip'), f('Betriebssystem'),
+      f('Umgebung', 'select', { options: ['Produktion', 'Staging', 'Test', 'Entwicklung'] }), f('Standort'), f('Verantwortlich'),
+      f('Wartungsfenster'), f('Garantie bis', 'date', { expiry: true, leadDays: 60 })] },
+    { name: 'Zertifikat', page_type: 'service', description: 'TLS-Zertifikate mit Ablauferinnerung', fields: [
+      f('Common Name', 'text', { required: true }), f('Aussteller'), f('Gültig bis', 'date', { required: true, expiry: true, leadDays: 30 }),
+      f('Erneuerung', 'select', { options: ['automatisch (ACME)', 'manuell'] }), f('Eingesetzt auf')] },
+    { name: 'Lizenz / Vertrag', page_type: 'doc', description: 'Lizenzen, Support- und Wartungsverträge', fields: [
+      f('Produkt', 'text', { required: true }), f('Anbieter'), f('Vertragsnummer'), f('Laufzeit bis', 'date', { expiry: true, leadDays: 90 }),
+      f('Kündigungsfrist'), f('Ansprechpartner', 'email')] },
+  ];
+}

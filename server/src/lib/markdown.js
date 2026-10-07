@@ -3,6 +3,7 @@ import path from 'node:path';
 import TurndownService from 'turndown';
 import YAML from 'yaml';
 import { many } from '../db/index.js';
+import { expandSnippets } from './snippets.js';
 
 /** HTML → Markdown for page exports, Git sync and backups */
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-' });
@@ -81,7 +82,7 @@ export async function exportTree(dir, { baseUrl = '' } = {}) {
           ...(p.updated_by_name ? { author: p.updated_by_name } : {}),
           version: p.version,
         };
-        await fs.writeFile(path.join(folder, `${name}.md`), absolutize(pageMarkdown(p, meta)));
+        await fs.writeFile(path.join(folder, `${name}.md`), absolutize(pageMarkdown({ ...p, content: await expandSnippets(p.content) }, meta)));
         files++;
         if (children.has(`${s.id}:${p.id}`)) {
           const sub = path.join(folder, name);

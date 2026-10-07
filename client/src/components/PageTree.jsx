@@ -123,6 +123,7 @@ export default function PageTree({ spaceKey, pages, canWrite, activeId }) {
           <Link to={`/p/${node.id}`} className="tree-link" title={node.title}>
             <PageIcon icon={node.icon} fallback={PAGE_TYPES[node.pageType]?.icon} size={15} />
             <span>{node.title}</span>
+            {node.restricted && <Icon name="lock" size={12} className="tree-lock" aria-label={tr('Eingeschränkt')} />}
           </Link>
           {overdue && <span className="tree-dot" title={tr('Review überfällig')} />}
           {canWrite && (

@@ -16,7 +16,7 @@ const IDENT_KEYS = /^(host|hostname|host-?name|fqdn|dns|dns-?name|ip|ip-?adresse
 router.get('/inventory', requireAuth, async (req, res) => {
   const type = TYPES.includes(req.query.type) ? req.query.type : 'host';
   const params = [req.user.id, type];
-  let where = 'space_access(p.space_id,$1) >= 1 AND p.page_type=$2';
+  let where = 'page_access(p.id,$1) >= 1 AND p.page_type=$2';
   if (req.query.space) {
     params.push(String(req.query.space));
     where += ` AND s.key=$${params.length}`;
@@ -31,7 +31,7 @@ router.get('/inventory', requireAuth, async (req, res) => {
     ),
     many(
       `SELECT p.page_type AS type, count(*)::int AS n FROM pages p
-        WHERE space_access(p.space_id,$1) >= 1 AND p.page_type = ANY($2) GROUP BY 1`,
+        WHERE page_access(p.id,$1) >= 1 AND p.page_type = ANY($2) GROUP BY 1`,
       [req.user.id, TYPES],
     ),
   ]);
@@ -72,7 +72,7 @@ router.get('/pages/:id/related', requireAuth, async (req, res) => {
       `SELECT p.id, p.title, p.icon, p.page_type, s.key AS space_key, s.name AS space_name, s.color AS space_color,
               (SELECT array_agg(x) FROM unnest($3::text[]) AS x WHERE p.content_text ~* x OR p.properties::text ~* x OR p.title ~* x) AS hits
          FROM pages p JOIN spaces s ON s.id=p.space_id
-        WHERE p.id<>$1 AND space_access(p.space_id,$2) >= 1
+        WHERE p.id<>$1 AND page_access(p.id,$2) >= 1
           AND (p.content_text ~* ANY($3) OR p.properties::text ~* ANY($3) OR p.title ~* ANY($3))
         ORDER BY p.page_type = ANY($4) DESC, p.updated_at DESC LIMIT 40`,
       [page.id, req.user.id, patterns, TYPES],
@@ -82,7 +82,7 @@ router.get('/pages/:id/related', requireAuth, async (req, res) => {
   const objects = await many(
     `SELECT p.id, p.title, p.icon, p.page_type, s.key AS space_key, s.name AS space_name, s.color AS space_color
        FROM pages p JOIN spaces s ON s.id=p.space_id
-      WHERE p.id<>$1 AND p.page_type = ANY($3) AND space_access(p.space_id,$2) >= 1 AND length(p.title) >= 3
+      WHERE p.id<>$1 AND p.page_type = ANY($3) AND page_access(p.id,$2) >= 1 AND length(p.title) >= 3
         AND ($4::text ~* ('\\m' || regexp_replace(p.title, '([.*+?^$(){}|\\[\\]\\\\])', '\\\\\\1', 'g') || '\\M'))
       ORDER BY p.title LIMIT 40`,
     [page.id, req.user.id, TYPES, `${page.title}\n${page.content_text}\n${Object.values(page.properties || {}).join('\n')}`],

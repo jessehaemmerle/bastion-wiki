@@ -75,9 +75,10 @@ router.post('/spaces', async (req, res) => {
 router.get('/spaces/:key', async (req, res) => {
   const space = await loadSpace(req.user, req.params.key);
   const pages = await many(
-    `SELECT id, parent_id, title, slug, icon, page_type, sort_order, updated_at, review_due
-       FROM pages WHERE space_id=$1 ORDER BY sort_order, title`,
-    [space.id],
+    `SELECT id, parent_id, title, slug, icon, page_type, sort_order, updated_at, review_due,
+            EXISTS (SELECT 1 FROM page_permissions pp WHERE pp.page_id=pages.id) AS restricted
+       FROM pages WHERE space_id=$1 AND page_access(id, $2) >= 1 ORDER BY sort_order, title`,
+    [space.id, req.user.id],
   );
   const stats = await one(
     `SELECT count(*)::int AS pages,
@@ -91,7 +92,7 @@ router.get('/spaces/:key', async (req, res) => {
     stats,
     pages: pages.map((p) => ({
       id: p.id, parentId: p.parent_id, title: p.title, slug: p.slug, icon: p.icon,
-      pageType: p.page_type, sortOrder: p.sort_order, updatedAt: p.updated_at, reviewDue: p.review_due,
+      pageType: p.page_type, sortOrder: p.sort_order, updatedAt: p.updated_at, reviewDue: p.review_due, restricted: p.restricted,
     })),
   });
 });
