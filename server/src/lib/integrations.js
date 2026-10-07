@@ -125,7 +125,7 @@ export async function saveSection(name, patch) {
     let v = patch[k];
     if (typeof dv === 'boolean') v = v === true;
     else if (typeof dv === 'number') {
-      v = Number(v);
+      v = v === '' ? dv : Number(v); // a cleared field falls back to the default (e.g. SMTP port), not 0
       if (!Number.isFinite(v)) throw badRequest(`Feld "${k}" muss eine Ganzzahl sein`);
     } else {
       if (typeof v !== 'string') throw badRequest(`Feld "${k}" muss Text sein`);

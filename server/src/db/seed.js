@@ -37,9 +37,14 @@ async function seedAdmin() {
   return user;
 }
 
+/** Demo content – once per installation (a marker keeps it away once all spaces were deleted) */
 async function seedDemo(admin) {
+  if (await one("SELECT 1 FROM settings WHERE key='seed.demo'")) return;
   const { n } = await one('SELECT count(*)::int AS n FROM spaces');
-  if (n > 0 || !config.seedDemo) return;
+  if (n > 0 || !config.seedDemo) {
+    if (n > 0) await query(`INSERT INTO settings (key, value) VALUES ('seed.demo', 'true') ON CONFLICT DO NOTHING`);
+    return;
+  }
   const demo = demoFor(config.language);
 
   const hostSchema = await one("SELECT id FROM sheet_schemas WHERE page_type='host' ORDER BY id LIMIT 1");
@@ -77,6 +82,7 @@ async function seedDemo(admin) {
         await c.query('INSERT INTO page_tags VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, tagIds[t]]);
       }
     }
+    await c.query(`INSERT INTO settings (key, value) VALUES ('seed.demo', 'true') ON CONFLICT DO NOTHING`);
   });
   console.log(`[seed] Beispielinhalte (${config.language}) angelegt`);
 }

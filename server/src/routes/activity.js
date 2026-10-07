@@ -51,7 +51,8 @@ router.get('/me/watches', requireAuth, async (req, res) => {
 
 // ------------------------------------------------------------------ inbox
 router.get('/notifications', requireAuth, async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 30, 100);
+  // interpolated into SQL: must be a positive integer (negative/NaN/Infinity → SQL error)
+  const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || 30, 1), 100);
   const [rows, unread] = await Promise.all([
     many(
       `SELECT n.*, p.title AS page_title, s.key AS space_key FROM notifications n

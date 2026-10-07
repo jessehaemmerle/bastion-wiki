@@ -123,7 +123,7 @@ app.use('/api', (req, res, next) => {
 
 // ------------------------------------------------------------------ Prometheus
 // Bearer METRICS_TOKEN, or an admin session / admin API token
-app.get('/metrics', authenticate, async (req, res, next) => {
+app.get('/metrics', authenticate, enforce2fa, async (req, res, next) => {
   try {
     const token = process.env.METRICS_TOKEN;
     const bearer = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');

@@ -128,13 +128,17 @@ router.patch('/admin/users/:id', async (req, res) => {
     const err = validatePassword(b.password);
     if (err) throw badRequest(err);
   }
+  // users.email is UNIQUE – report a clash instead of failing with a 500
+  if (b.email && (await one('SELECT 1 FROM users WHERE lower(email)=lower($1) AND id<>$2', [b.email, id]))) {
+    throw conflict('Benutzername oder E-Mail bereits vergeben');
+  }
   const user = await tx(async (c) => {
     const { rows } = await c.query(
       `UPDATE users SET email = CASE WHEN $2::boolean THEN $3 ELSE email END,
               display_name=COALESCE($4,display_name), role=COALESCE($5,role), is_active=COALESCE($6,is_active),
               password_hash=COALESCE($7,password_hash), updated_at=now()
         WHERE id=$1 RETURNING *`,
-      [id, 'email' in b, b.email ?? null, b.displayName, b.role, b.isActive, b.password ? await hashPassword(b.password) : null],
+      [id, 'email' in b, b.email ?? null, b.displayName || null, b.role, b.isActive, b.password ? await hashPassword(b.password) : null],
     );
     if (b.groupIds) {
       await c.query('DELETE FROM group_members WHERE user_id=$1', [id]);
@@ -289,10 +293,11 @@ router.get('/admin/audit', async (req, res) => {
   const params = [];
   const where = [];
   if (req.query.action) { params.push(`${req.query.action}%`); where.push(`a.action LIKE $${params.length}`); }
-  if (req.query.user) { params.push(Number(req.query.user)); where.push(`a.user_id = $${params.length}`); }
+  if (req.query.user) { params.push(intParam(req.query.user, 'Benutzer-ID')); where.push(`a.user_id = $${params.length}`); }
   if (req.query.q) { params.push(`%${req.query.q}%`); where.push(`(a.details::text ILIKE $${params.length} OR a.action ILIKE $${params.length} OR u.display_name ILIKE $${params.length})`); }
-  const limit = Math.min(Number(req.query.limit) || 50, 500);
-  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  // interpolated into SQL: must be finite, non-negative integers
+  const limit = Math.min(Math.max(Math.trunc(Number(req.query.limit)) || 50, 1), 500);
+  const offset = Number.isSafeInteger(Math.trunc(Number(req.query.offset))) ? Math.max(Math.trunc(Number(req.query.offset)), 0) : 0;
   const sqlWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const [rows, total] = await Promise.all([
     many(`SELECT a.*, u.display_name AS user_name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ${sqlWhere}

@@ -147,7 +147,11 @@ router.get('/admin/ops/backups/:name', async (req, res) => {
   await audit(req, 'admin.backup.download', 'system', req.params.name);
   res.setHeader('Content-Type', 'application/gzip');
   res.setHeader('Content-Disposition', `attachment; filename="bastion-${req.params.name}"`);
-  backupStream(req.params.name).pipe(res);
+  // a missing/unreadable file must not become an unhandled 'error' event (would crash the process)
+  backupStream(req.params.name).on('error', (err) => {
+    console.error('[backup] download', err.message);
+    res.destroy(err);
+  }).pipe(res);
 });
 
 router.delete('/admin/ops/backups/:name', async (req, res) => {
@@ -163,12 +167,12 @@ const restoreUpload = multer({ dest: os.tmpdir(), limits: { fileSize: Number(pro
 /** Restore from a stored backup (body.name) or an uploaded archive (multipart "file"). Needs confirm=RESTORE. */
 router.post('/admin/ops/restore', async (req, res) => {
   await new Promise((resolve, reject) => restoreUpload.single('file')(req, res, (err) => (err ? reject(badRequest(err.message)) : resolve())));
-  if (req.body?.confirm !== 'RESTORE') throw badRequest('Bitte die Wiederherstellung bestätigen');
-  const file = req.file?.path || backupPath(req.body?.name);
-  if (!file) throw notFound('Sicherung nicht gefunden');
-  // safety net: snapshot of the current state first
-  const before = await createBackup('manual');
   try {
+    if (req.body?.confirm !== 'RESTORE') throw badRequest('Bitte die Wiederherstellung bestätigen');
+    const file = req.file?.path || backupPath(req.body?.name);
+    if (!file) throw notFound('Sicherung nicht gefunden');
+    // safety net: snapshot of the current state first
+    const before = await createBackup('manual');
     const result = await restoreBackup(file);
     console.log(`[backup] wiederhergestellt (vorher gesichert als ${before.name})`);
     res.json({ ok: true, safetyBackup: before.name, warnings: result.warnings, createdAt: result.manifest.createdAt });

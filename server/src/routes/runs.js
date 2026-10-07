@@ -135,10 +135,12 @@ router.patch('/runs/:id', async (req, res) => {
     await query('UPDATE runbook_runs SET summary=$2, updated_at=now() WHERE id=$1', [run.id, b.summary]);
   }
   if (b.status) {
-    await query(
-      `UPDATE runbook_runs SET status=$2, finished_at=now(), log = log || $3::jsonb, updated_at=now() WHERE id=$1`,
+    // only a running run can be finished – a concurrent "done"/"aborted" must not overwrite the outcome
+    const { rowCount } = await query(
+      `UPDATE runbook_runs SET status=$2, finished_at=now(), log = log || $3::jsonb, updated_at=now() WHERE id=$1 AND status='running'`,
       [run.id, b.status, JSON.stringify([{ at: now, by, type: b.status }])],
     );
+    if (!rowCount) throw conflict('Der Durchlauf ist bereits beendet');
     await audit(req, `run.${b.status === 'done' ? 'finish' : 'abort'}`, 'page', page.id, { run: run.id });
     notifyPageEvent('run.finish', page, req.user, { status: b.status, runId: run.id });
   }

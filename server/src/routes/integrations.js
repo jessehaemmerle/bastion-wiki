@@ -27,7 +27,7 @@ router.get('/admin/integrations', async (req, res) => {
 
 router.put('/admin/integrations/:section', async (req, res) => {
   const name = req.params.section;
-  if (!SECTIONS[name]) throw notFound('Unbekannter Bereich');
+  if (!Object.hasOwn(SECTIONS, name)) throw notFound('Unbekannter Bereich'); // not "constructor" etc.
   const saved = await saveSection(name, req.body || {});
   const changed = Object.keys(req.body || {}).filter((k) => k in SECTIONS[name].defaults);
   await audit(req, 'admin.integration', 'settings', name, { fields: changed });

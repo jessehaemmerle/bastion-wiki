@@ -20,8 +20,10 @@ import YAML from 'yaml';
 
 export const PAGE_PREFIX = 'bimp://page/';
 export const FILE_PREFIX = 'bimp://file/';
-export const pageRef = (key) => PAGE_PREFIX + encodeURIComponent(key);
-export const fileRef = (key) => FILE_PREFIX + encodeURIComponent(key);
+// also escape ' ( ) ! * – the writer finds placeholders with /[^"'\s)<>]+/, so "Screenshot (2).png" would be cut off
+const encodeKey = (key) => encodeURIComponent(key).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+export const pageRef = (key) => PAGE_PREFIX + encodeKey(key);
+export const fileRef = (key) => FILE_PREFIX + encodeKey(key);
 
 const MAX_ENTRIES = 50000;
 const MAX_UNCOMPRESSED = Number(process.env.IMPORT_MAX_UNCOMPRESSED_MB || 4096) * 1024 * 1024;
@@ -43,17 +45,17 @@ export function openZip(file) {
   const total = raw.reduce((n, e) => n + (e.header.size || 0), 0);
   if (total > MAX_UNCOMPRESSED) throw new Error('Das Archiv ist entpackt zu groß');
 
-  const names = raw.map((e) => e.entryName.replace(/\\/g, '/'))
-    .filter((n) => !n.split('/').some((s) => s === '__MACOSX' || s === '.git' || s.startsWith('.DS_Store')));
+  const names = new Set(raw.map((e) => e.entryName.replace(/\\/g, '/'))
+    .filter((n) => !n.split('/').some((s) => s === '__MACOSX' || s === '.git' || s.startsWith('.DS_Store'))));
   // strip a single common wrapper directory ("export-2024/…")
   let prefix = '';
-  const first = new Set(names.map((n) => (n.includes('/') ? n.split('/')[0] : '')));
+  const first = new Set([...names].map((n) => (n.includes('/') ? n.split('/')[0] : '')));
   if (first.size === 1 && !first.has('')) prefix = `${[...first][0]}/`;
 
   const entries = new Map();
   for (const e of raw) {
     const name = e.entryName.replace(/\\/g, '/');
-    if (!names.includes(name)) continue;
+    if (!names.has(name)) continue;
     const rel = path.posix.normalize(name.slice(prefix.length)).replace(/^(\.\.\/)+/, '');
     entries.set(rel, e);
   }
@@ -78,7 +80,9 @@ export const isImage = (name) => /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i.test(na
 
 /** "netzwerk-und_firewall" → "Netzwerk und firewall" */
 export function humanize(segment) {
-  const s = decodeURIComponent(String(segment)).replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+  let s = String(segment);
+  try { s = decodeURIComponent(s); } catch { /* e.g. "100%-Plan" – keep as is */ }
+  s = s.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
   return s ? s[0].toUpperCase() + s.slice(1) : 'Unbenannt';
 }
 

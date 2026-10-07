@@ -44,6 +44,7 @@ export async function importWikiJsApi({ url, token }, onProgress = () => {}) {
       'query($id:Int!){ pages { single(id:$id) { id path locale title description content editor isPublished tags { tag } createdAt updatedAt } } }',
       { id: item.id },
     );
+    if (!p) { warnings.push(`Seite nicht gefunden (inzwischen gelöscht?): /${item.path}`); onProgress(++done, list.length); continue; }
     const prefix = locales.size > 1 ? `${p.locale}/` : '';
     const ext = p.editor === 'markdown' ? 'md' : 'html';
     const header = [
@@ -58,7 +59,9 @@ export async function importWikiJsApi({ url, token }, onProgress = () => {}) {
     ].join('\n');
     files[`${prefix}${p.path}.${ext}`] = header + (p.content || '');
     for (const m of (p.content || '').matchAll(ASSET_RE)) {
-      const assetPath = decodeURIComponent(m[1]).replace(/^\//, '');
+      let assetPath = m[1];
+      try { assetPath = decodeURIComponent(assetPath); } catch { /* keep raw */ }
+      assetPath = assetPath.replace(/^\//, '');
       if (files[assetPath]) continue;
       try {
         files[assetPath] = (await fetchBinary(`${base}/${encodeURI(assetPath)}`, { headers: { Authorization: headers.Authorization } })).data;

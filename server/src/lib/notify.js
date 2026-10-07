@@ -73,7 +73,17 @@ export function eventText(lang, kind, data) {
  * Records an event for watchers and fires webhooks. Never throws – notifications must not break saving.
  * page: { id, title, space_id, space_key?, space_name? } (for deletions a snapshot)
  */
-export async function notifyPageEvent(kind, page, actor, extraIn = {}) {
+const pageQueues = new Map();
+export function notifyPageEvent(kind, page, actor, extraIn = {}) {
+  // Events of one page run one after another: callers fire and forget, and a burst of saves
+  // must still be merged into one entry instead of racing past each other
+  const run = (pageQueues.get(page.id) || Promise.resolve()).then(() => recordPageEvent(kind, page, actor, extraIn));
+  pageQueues.set(page.id, run);
+  run.finally(() => { if (pageQueues.get(page.id) === run) pageQueues.delete(page.id); });
+  return run;
+}
+
+async function recordPageEvent(kind, page, actor, extraIn) {
   const { skipUsers = [], ...extra } = extraIn;
   try {
     const space = page.space_key ? { key: page.space_key, name: page.space_name } : await one('SELECT key, name FROM spaces WHERE id=$1', [page.space_id]);
@@ -105,7 +115,8 @@ export async function notifyPageEvent(kind, page, actor, extraIn = {}) {
         [r.id, kind, alive ? page.id : null, actor?.id ?? null, data],
       );
     }
-    await deliverWebhooks(kind, { ...data, pageId: alive ? page.id : null, spaceId: page.space_id, restrictedPageId: alive ? page.id : null });
+    // deletions are announced before the page is removed, so its restrictions can still be checked
+    await deliverWebhooks(kind, { ...data, pageId: alive ? page.id : null, spaceId: page.space_id, restrictedPageId: page.id });
   } catch (err) {
     console.error('[notify]', err.message);
   }
@@ -171,6 +182,7 @@ async function postHook(hook, body) {
       signal: AbortSignal.timeout(8000),
     });
     status = res.ok ? `${res.status}` : `HTTP ${res.status}`;
+    await res.body?.cancel().catch(() => {}); // release the connection
   } catch (err) {
     status = err.cause?.code || err.message;
   }
@@ -215,7 +227,7 @@ export async function sendDigests() {
   // already read in the app → no mail needed
   await query('UPDATE notifications SET emailed_at=now() WHERE emailed_at IS NULL AND read_at IS NOT NULL');
   const rows = await many(
-    `SELECT n.*, u.email, u.preferences, u.display_name FROM notifications n JOIN users u ON u.id=n.user_id
+    `SELECT n.*, n.created_at::text AS created_raw, u.email, u.preferences, u.display_name, u.is_active FROM notifications n JOIN users u ON u.id=n.user_id
       WHERE n.emailed_at IS NULL AND n.created_at < now() - make_interval(mins => $1)
       ORDER BY n.user_id, n.created_at`,
     [wait],
@@ -229,7 +241,7 @@ export async function sendDigests() {
   for (const [userId, list] of byUser) {
     const u = list[0];
     const ids = list.map((n) => n.id);
-    const wants = u.email && u.preferences?.emailNotifications !== false;
+    const wants = u.email && u.is_active && u.preferences?.emailNotifications !== false;
     if (wants) {
       const lang = u.preferences?.language || settings.defaultLanguage || 'de';
       const items = list.map((n) => ({
@@ -249,7 +261,8 @@ export async function sendDigests() {
         continue; // retry next round
       }
     }
-    await query('UPDATE notifications SET emailed_at=now() WHERE id = ANY($1)', [ids]);
+    // entries bumped by a new edit while the mail was being sent (created_at moves on) stay queued
+    await query('UPDATE notifications SET emailed_at=now() WHERE id = ANY($1) AND created_at <= $2::timestamptz', [ids, list[list.length - 1].created_raw]);
   }
   return sent;
 }

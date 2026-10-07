@@ -57,7 +57,8 @@ export async function syncGit({ force = false } = {}) {
   if (gitState.running) throw new Error('Synchronisierung läuft bereits');
   gitState.running = true;
   gitState.lastRun = new Date().toISOString();
-  const branch = (cfg.branch || 'main').replace(/[^\w./-]/g, '') || 'main';
+  // no leading "-": the branch is passed as a plain argument (ls-remote/fetch would read it as an option)
+  const branch = (cfg.branch || 'main').replace(/[^\w./-]/g, '').replace(/^-+/, '') || 'main';
   const note = (m) => gitState.log.unshift({ at: new Date().toISOString(), message: m }) && gitState.log.splice(20);
   try {
     await fs.mkdir(repoDir, { recursive: true });

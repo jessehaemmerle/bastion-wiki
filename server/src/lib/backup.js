@@ -7,8 +7,10 @@ import { config } from '../config.js';
 import { many, one, pool, query } from '../db/index.js';
 import { exportTree } from './markdown.js';
 import { tryDecrypt } from './crypto.js';
+import { badRequest } from './http.js';
 import { clearIntegrationCache } from './integrations.js';
 import { ensureLinkIndex } from './links.js';
+import { updateSettings } from './settings.js';
 
 /**
  * Full backups as .tar.gz: every table as JSON (incl. users, versions, audit log),
@@ -45,17 +47,40 @@ export async function createBackup(kind = 'manual') {
   try {
     await fs.mkdir(path.join(work, 'db'));
     const counts = {};
-    for (const t of TABLES) {
-      const rows = await many(`SELECT * FROM ${t} ORDER BY 1`); // parents first (e.g. comment threads)
-      // generated columns cannot be inserted back
-      const generated = (await columnsOf(t)).filter((c) => c.is_generated === 'ALWAYS').map((c) => c.column_name);
-      for (const r of rows) for (const g of generated) delete r[g];
-      counts[t] = rows.length;
-      await fs.writeFile(path.join(work, 'db', `${t}.json`), JSON.stringify(rows));
+    const sequences = {};
+    // one snapshot for all tables – otherwise rows written meanwhile (e.g. a revision of a page
+    // created after "pages" was read) break the foreign keys and the backup cannot be restored
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      // TRUNCATE (restore) is not MVCC-safe: hold the tables so it cannot empty them under the snapshot
+      await client.query(`LOCK TABLE ${TABLES.join(', ')} IN ACCESS SHARE MODE`);
+      for (const t of TABLES) {
+        const { rows } = await client.query(`SELECT * FROM ${t} ORDER BY 1`); // parents first (e.g. comment threads)
+        // generated columns cannot be inserted back
+        const cols = await columnsOf(t);
+        const generated = cols.filter((c) => c.is_generated === 'ALWAYS').map((c) => c.column_name);
+        for (const r of rows) for (const g of generated) delete r[g];
+        counts[t] = rows.length;
+        await fs.writeFile(path.join(work, 'db', `${t}.json`), JSON.stringify(rows));
+        // sequence positions: ids of deleted rows (trash, stale grants) must not be handed out again after a restore
+        const hasSerial = ['integer', 'bigint'].includes(cols.find((c) => c.column_name === 'id')?.data_type);
+        const seq = hasSerial && (await client.query(`SELECT pg_get_serial_sequence($1, 'id') AS name`, [t])).rows[0]?.name;
+        if (seq) {
+          const { rows: [sv] } = await client.query(`SELECT last_value, is_called FROM ${seq}`);
+          sequences[t] = sv.is_called ? Number(sv.last_value) : Number(sv.last_value) - 1;
+        }
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
     }
     const migration = await one('SELECT max(name) AS name FROM schema_migrations');
     await fs.writeFile(path.join(work, 'manifest.json'), JSON.stringify({
-      format: 'bastion-backup', version: 1, createdAt: new Date().toISOString(), schema: migration?.name, counts,
+      format: 'bastion-backup', version: 1, createdAt: new Date().toISOString(), schema: migration?.name, counts, sequences,
     }, null, 2));
     await fs.writeFile(path.join(work, 'README.txt'), [
       'Bastion backup',
@@ -108,9 +133,14 @@ export async function restoreBackup(file) {
   const work = await fs.mkdtemp(path.join(os.tmpdir(), 'bastion-restore-'));
   const warnings = [];
   try {
-    await tar.x({ file, cwd: work, strict: true, filter: (p, entry) => !p.includes('..') && ['File', 'Directory'].includes(entry.type) });
-    const manifest = JSON.parse(await fs.readFile(path.join(work, 'manifest.json'), 'utf8').catch(() => 'null'));
-    if (manifest?.format !== 'bastion-backup') throw new Error('Keine gültige Bastion-Sicherung');
+    try {
+      await tar.x({ file, cwd: work, strict: true, filter: (p, entry) => !p.includes('..') && ['File', 'Directory'].includes(entry.type) });
+    } catch {
+      throw badRequest('Keine gültige Bastion-Sicherung');
+    }
+    let manifest = null;
+    try { manifest = JSON.parse(await fs.readFile(path.join(work, 'manifest.json'), 'utf8')); } catch { /* checked below */ }
+    if (manifest?.format !== 'bastion-backup') throw badRequest('Keine gültige Bastion-Sicherung');
 
     const client = await pool.connect();
     try {
@@ -138,13 +168,20 @@ export async function restoreBackup(file) {
             await client.query('UPDATE pages SET parent_id=$2 WHERE id=$1', [row.id, row.parent_id]);
           }
         }
-        if (['integer', 'bigint'].includes(known.get('id'))) {
-          await client.query(
-            `SELECT setval(pg_get_serial_sequence($1,'id'), coalesce((SELECT max(id) FROM ${t}), 1), (SELECT max(id) FROM ${t}) IS NOT NULL)
-              WHERE pg_get_serial_sequence($1,'id') IS NOT NULL`,
-            [t],
-          );
-        }
+      }
+      // sequences: never below the highest id in use, nor below the position at backup time
+      // (trashed pages keep their id for a restore; older backups only have the trash to go by)
+      for (const t of TABLES) {
+        const cols = await columnsOf(t);
+        if (!['integer', 'bigint'].includes(cols.find((c) => c.column_name === 'id')?.data_type)) continue;
+        const saved = Number(manifest.sequences?.[t]) || 0;
+        const extra = t === 'pages' ? ', (SELECT max(page_id) FROM page_trash)' : '';
+        await client.query(
+          `SELECT setval(seq, greatest(v, 1), v IS NOT NULL AND v > 0)
+             FROM (SELECT pg_get_serial_sequence($1,'id') AS seq, greatest((SELECT max(id) FROM ${t}), $2::bigint${extra}) AS v) x
+            WHERE seq IS NOT NULL`,
+          [t, saved],
+        );
       }
       await client.query('COMMIT');
     } catch (err) {
@@ -163,6 +200,7 @@ export async function restoreBackup(file) {
       }
     }
     clearIntegrationCache();
+    await updateSettings({}); // drops the cached site settings (name, CSS, …) of the replaced database
     await ensureLinkIndex();
     const sample = await one('SELECT ciphertext FROM page_secrets LIMIT 1');
     if (sample && !tryDecrypt(sample.ciphertext)) {

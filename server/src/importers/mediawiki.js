@@ -10,7 +10,8 @@ import { mediawikiToHtml } from './wikitext.js';
 const normTitle = (t) => String(t).replace(/_/g, ' ').trim().replace(/^./, (c) => c.toUpperCase());
 
 export async function importMediaWikiXml(xml, { imagesZip = null, namespaces = [0] } = {}) {
-  const parser = new XMLParser({ ignoreAttributes: false, isArray: (name) => ['page', 'revision', 'namespace'].includes(name) });
+  // parseTagValue off: titles/texts like "0815" or "1.10" must stay strings, not become numbers
+  const parser = new XMLParser({ ignoreAttributes: false, parseTagValue: false, isArray: (name) => ['page', 'revision', 'namespace'].includes(name) });
   let doc;
   try {
     doc = parser.parse(xml);
@@ -32,7 +33,8 @@ export async function importMediaWikiXml(xml, { imagesZip = null, namespaces = [
   for (const p of pages) {
     if (!namespaces.includes(Number(p.ns))) { skipped++; continue; }
     if (p.redirect !== undefined) { skipped++; continue; }
-    const rev = p.revision[p.revision.length - 1];
+    const rev = p.revision?.[p.revision.length - 1];
+    if (!rev) { skipped++; continue; }
     const text = typeof rev.text === 'object' ? rev.text['#text'] ?? '' : rev.text ?? '';
     if (/^#(redirect|weiterleitung)/i.test(String(text).trim())) { skipped++; continue; }
     items.push({ title: normTitle(p.title), text: String(text), timestamp: rev.timestamp, author: rev.contributor?.username });

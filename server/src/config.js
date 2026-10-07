@@ -6,7 +6,7 @@ export const config = {
   port: Number(env.PORT || 3000),
   databaseUrl:
     env.DATABASE_URL ||
-    `postgres://${env.POSTGRES_USER || 'bastion'}:${env.POSTGRES_PASSWORD || 'bastion'}@${env.POSTGRES_HOST || 'localhost'}:${env.POSTGRES_PORT || 5432}/${env.POSTGRES_DB || 'bastion'}`,
+    `postgres://${encodeURIComponent(env.POSTGRES_USER || 'bastion')}:${encodeURIComponent(env.POSTGRES_PASSWORD || 'bastion')}@${env.POSTGRES_HOST || 'localhost'}:${env.POSTGRES_PORT || 5432}/${encodeURIComponent(env.POSTGRES_DB || 'bastion')}`,
   dataDir: path.resolve(env.DATA_DIR || './data'),
   publicDir: path.resolve(env.PUBLIC_DIR || '../client/dist'),
   sessionDays: Number(env.SESSION_DAYS || 14),

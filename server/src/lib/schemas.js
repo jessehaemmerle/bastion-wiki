@@ -30,7 +30,7 @@ export function cleanFields(input) {
       required: Boolean(f.required),
       options,
       expiry: type === 'date' && Boolean(f.expiry),
-      leadDays: Math.min(Math.max(Number(f.leadDays) || 30, 0), 365),
+      leadDays: Math.min(Math.max(Number.isFinite(Number(f.leadDays)) && f.leadDays !== '' && f.leadDays != null ? Number(f.leadDays) : 30, 0), 365),
       hint: String(f.hint || '').trim().slice(0, 200),
     };
   });

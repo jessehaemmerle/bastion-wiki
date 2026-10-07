@@ -56,8 +56,11 @@ async function hourly() {
   });
 }
 
+// a rejected tick (e.g. database briefly unreachable) must not become an unhandled rejection – that ends the process
+const tick = (name, fn) => () => { fn().catch((err) => console.error(`[jobs] ${name}:`, err.message)); };
+
 export function startScheduler() {
-  setTimeout(() => { hourly(); }, 20 * 1000).unref();
-  setInterval(() => { minutely(); }, 60 * 1000).unref();
-  setInterval(() => { hourly(); }, 60 * 60 * 1000).unref();
+  setTimeout(tick('hourly', hourly), 20 * 1000).unref();
+  setInterval(tick('minutely', minutely), 60 * 1000).unref();
+  setInterval(tick('hourly', hourly), 60 * 60 * 1000).unref();
 }
