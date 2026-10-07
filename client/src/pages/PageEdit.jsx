@@ -10,26 +10,27 @@ import { api, qs } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { useChrome } from '../lib/hooks.js';
 import { PAGE_TYPES, timeAgo } from '../lib/format.js';
+import { getLanguage, getLocale, tr } from '../lib/i18n.js';
 
 const draftKey = (id) => `bastion.draft.${id || 'new'}`;
 
 function TemplatePicker({ onPick }) {
   const [templates, setTemplates] = useState(null);
-  useEffect(() => { api.get('/templates').then((d) => setTemplates(d.templates)).catch(() => setTemplates([])); }, []);
+  useEffect(() => { api.get(`/templates?lang=${getLanguage()}`).then((d) => setTemplates(d.templates)).catch(() => setTemplates([])); }, []);
   if (!templates) return <Spinner center />;
   return (
     <div className="content narrow">
       <div className="page-head">
         <div>
-          <h1>Neue Seite</h1>
-          <p>Wähle eine Vorlage. Sie legt Gliederung, Seitentyp und Datenblatt-Felder fest.</p>
+          <h1>{tr('Neue Seite')}</h1>
+          <p>{tr('Wähle eine Vorlage. Sie legt Gliederung, Seitentyp und Datenblatt-Felder fest.')}</p>
         </div>
       </div>
       <div className="choice-list">
         <button className="choice" onClick={() => onPick(null)}>
           <Icon name="file" size={18} />
-          <strong>Leere Seite</strong>
-          <span>Ohne Struktur beginnen.</span>
+          <strong>{tr('Leere Seite')}</strong>
+          <span>{tr('Ohne Struktur beginnen.')}</span>
         </button>
         {templates.map((t) => (
           <button key={t.id} className="choice" onClick={() => onPick(t)}>
@@ -74,7 +75,7 @@ export default function PageEdit({ isNew = false }) {
       return;
     }
     api.get(`/pages/${id}`).then(({ page }) => {
-      if (!['write', 'admin'].includes(page.access)) throw new Error('Keine Schreibrechte für diese Seite');
+      if (!['write', 'admin'].includes(page.access)) throw new Error(tr('Keine Schreibrechte für diese Seite'));
       setPage(page);
       setForm({
         title: page.title, content: page.content, spaceKey: page.space.key, parentId: page.parentId, pageType: page.pageType,
@@ -122,8 +123,8 @@ export default function PageEdit({ isNew = false }) {
 
   const space = spaces.find((s) => s.key === form?.spaceKey);
   useChrome(
-    isNew ? [{ label: space?.name || 'Neue Seite', to: space ? `/s/${space.key}` : undefined }, { label: 'Neue Seite' }]
-      : [{ label: page?.space.name || '…', to: page ? `/s/${page.space.key}` : undefined }, { label: page?.title || '…', to: page ? `/p/${page.id}` : undefined }, { label: 'Bearbeiten' }],
+    isNew ? [{ label: space?.name || tr('Neue Seite'), to: space ? `/s/${space.key}` : undefined }, { label: tr('Neue Seite') }]
+      : [{ label: page?.space.name || '…', to: page ? `/s/${page.space.key}` : undefined }, { label: page?.title || '…', to: page ? `/p/${page.id}` : undefined }, { label: tr('Bearbeiten') }],
     form?.spaceKey || null,
     page?.id || null,
   );
@@ -140,9 +141,9 @@ export default function PageEdit({ isNew = false }) {
 
   const save = useCallback(async () => {
     const f = formRef.current;
-    if (!f.title.trim()) { toast('Bitte einen Titel angeben', 'error'); return; }
+    if (!f.title.trim()) { toast(tr('Bitte einen Titel angeben'), 'error'); return; }
     const sp = spaces.find((s) => s.key === f.spaceKey);
-    if (isNew && !sp) { toast('Bitte einen Bereich wählen', 'error'); return; }
+    if (isNew && !sp) { toast(tr('Bitte einen Bereich wählen'), 'error'); return; }
     setSaving(true);
     const body = {
       title: f.title, content: f.content, pageType: f.pageType, icon: f.icon || null, tags: f.tags,
@@ -154,7 +155,7 @@ export default function PageEdit({ isNew = false }) {
         : await api.put(`/pages/${id}`, { ...body, baseVersion: page.version });
       localStorage.removeItem(draftKey(id));
       setDirty(false);
-      toast(isNew ? 'Seite erstellt' : 'Gespeichert');
+      toast(isNew ? tr('Seite erstellt') : tr('Gespeichert'));
       refreshTree();
       navigate(`/p/${res.page.id}`);
     } catch (e) {
@@ -177,7 +178,7 @@ export default function PageEdit({ isNew = false }) {
 
   if (error) return <NotFound message={error.message} />;
   if (!form) return <Spinner center />;
-  if (isNew && !writable.length) return <NotFound message="Du hast in keinem Bereich Schreibrechte." />;
+  if (isNew && !writable.length) return <NotFound message={tr('Du hast in keinem Bereich Schreibrechte.')} />;
   if (!templateChosen) return <TemplatePicker onPick={pickTemplate} />;
 
   const parentOptions = [];
@@ -196,16 +197,16 @@ export default function PageEdit({ isNew = false }) {
         {draft && (
           <div className="review-banner" style={{ background: 'var(--accent-softer)', borderColor: 'var(--accent-border)' }}>
             <Icon name="history" size={18} />
-            <div className="grow">Ungespeicherter Entwurf vom {new Date(draft.savedAt).toLocaleString('de-DE')} gefunden.</div>
-            <button className="btn sm" onClick={() => { setForm(draft.form); setEditorKey((k) => k + 1); setDraft(false); setDirty(true); }}>Wiederherstellen</button>
-            <button className="btn sm ghost" onClick={() => { localStorage.removeItem(draftKey(id)); setDraft(false); }}>Verwerfen</button>
+            <div className="grow">{tr('Ungespeicherter Entwurf vom {date} gefunden.', { date: new Date(draft.savedAt).toLocaleString(getLocale()) })}</div>
+            <button className="btn sm" onClick={() => { setForm(draft.form); setEditorKey((k) => k + 1); setDraft(false); setDirty(true); }}>{tr('Wiederherstellen')}</button>
+            <button className="btn sm ghost" onClick={() => { localStorage.removeItem(draftKey(id)); setDraft(false); }}>{tr('Verwerfen')}</button>
           </div>
         )}
 
         <div className="row between wrap">
-          <span className="eyebrow">{isNew ? 'Neue Seite' : `Version ${page.version} bearbeiten`}</span>
+          <span className="eyebrow">{isNew ? tr('Neue Seite') : tr('Version {n} bearbeiten', { n: page.version })}</span>
           <button className="btn ghost sm" onClick={() => setShowMeta((s) => !s)}>
-            <Icon name="settings" size={14} /> {showMeta ? 'Details ausblenden' : 'Details & Eigenschaften'}
+            <Icon name="settings" size={14} /> {showMeta ? tr('Details ausblenden') : tr('Details & Eigenschaften')}
           </button>
         </div>
         <div className="row" style={{ gap: 10 }}>
@@ -214,11 +215,11 @@ export default function PageEdit({ isNew = false }) {
             style={{ width: 56, height: 56, fontSize: 26, textAlign: 'center', padding: 0, flexShrink: 0 }}
             value={form.icon}
             maxLength={4}
-            placeholder="–" aria-label="Seitensymbol (Emoji)"
-            title="Emoji als Seitensymbol"
+            placeholder="–" aria-label={tr('Seitensymbol (Emoji)')}
+            title={tr('Emoji als Seitensymbol')}
             onChange={(e) => set('icon', e.target.value)}
           />
-          <input className="title-input" value={form.title} placeholder="Seitentitel" autoFocus={isNew} onChange={(e) => set('title', e.target.value)}
+          <input className="title-input" value={form.title} placeholder={tr('Seitentitel')} autoFocus={isNew} onChange={(e) => set('title', e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.querySelector('.ProseMirror')?.focus(); } }} />
         </div>
 
@@ -227,36 +228,36 @@ export default function PageEdit({ isNew = false }) {
             <div className="editor-meta" style={{ marginTop: 0 }}>
               {isNew && (
                 <div className="field">
-                  <label>Bereich</label>
+                  <label>{tr('Bereich')}</label>
                   <select className="select" value={form.spaceKey} onChange={(e) => { set('spaceKey', e.target.value); set('parentId', null); }}>
                     {writable.map((s) => <option key={s.id} value={s.key}>{s.name}</option>)}
                   </select>
                 </div>
               )}
               <div className="field">
-                <label>Übergeordnete Seite</label>
+                <label>{tr('Übergeordnete Seite')}</label>
                 <select className="select" value={form.parentId || ''} onChange={(e) => set('parentId', e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">— Oberste Ebene —</option>
+                  <option value="">{tr('— Oberste Ebene —')}</option>
                   {parentOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
               </div>
               <div className="field">
-                <label>Seitentyp</label>
+                <label>{tr('Seitentyp')}</label>
                 <select className="select" value={form.pageType} onChange={(e) => set('pageType', e.target.value)}>
                   {Object.entries(PAGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div className="field">
-                <label>Nächstes Review</label>
+                <label>{tr('Nächstes Review')}</label>
                 <input type="date" className="input" value={form.reviewDue || ''} onChange={(e) => set('reviewDue', e.target.value)} />
               </div>
             </div>
             <div className="field" style={{ marginBottom: 14 }}>
-              <label>Tags</label>
+              <label>{tr('Tags')}</label>
               <TagInput value={form.tags} onChange={(t) => set('tags', t)} />
             </div>
             <div className="field">
-              <label>Eigenschaften <span className="faint">(strukturierte Daten wie Hostname, IP, Owner – durchsuchbar)</span></label>
+              <label>{tr('Eigenschaften')} <span className="faint">{tr('(strukturierte Daten wie Hostname, IP, Owner – durchsuchbar)')}</span></label>
               <PropertiesEditor value={form.properties} onChange={(p) => set('properties', p)} />
             </div>
           </div>
@@ -268,12 +269,12 @@ export default function PageEdit({ isNew = false }) {
         <div className="editor-actions">
           <span className="status">
             <span className={`dot ${dirty ? 'dirty' : 'ok'}`} />
-            {dirty ? 'Ungespeicherte Änderungen (Entwurf lokal gesichert)' : page ? `Gespeichert ${timeAgo(page.updatedAt)}` : 'Neu'}
+            {dirty ? tr('Ungespeicherte Änderungen (Entwurf lokal gesichert)') : page ? tr('Gespeichert {when}', { when: timeAgo(page.updatedAt) }) : tr('Neu')}
           </span>
-          <input className="input sm grow desktop-only" style={{ maxWidth: 360, marginLeft: 'auto' }} placeholder="Änderungsnotiz (optional)" value={form.summary} onChange={(e) => set('summary', e.target.value)} />
-          <button className="btn" onClick={() => { if (!dirty || confirm('Änderungen verwerfen?')) { localStorage.removeItem(draftKey(id)); navigate(isNew ? (space ? `/s/${space.key}` : '/') : `/p/${id}`); } }}>Abbrechen</button>
+          <input className="input sm grow desktop-only" style={{ maxWidth: 360, marginLeft: 'auto' }} placeholder={tr('Änderungsnotiz (optional)')} value={form.summary} onChange={(e) => set('summary', e.target.value)} />
+          <button className="btn" onClick={() => { if (!dirty || confirm(tr('Änderungen verwerfen?'))) { localStorage.removeItem(draftKey(id)); navigate(isNew ? (space ? `/s/${space.key}` : '/') : `/p/${id}`); } }}>{tr('Abbrechen')}</button>
           <button className="btn primary" onClick={save} disabled={saving}>
-            {saving ? <span className="spinner" /> : <Icon name="save" />} Speichern <span className="kbd desktop-only" style={{ background: 'transparent', color: 'inherit', borderColor: 'rgba(255,255,255,.3)' }}>Strg S</span>
+            {saving ? <span className="spinner" /> : <Icon name="save" />} {tr('Speichern')} <span className="kbd desktop-only" style={{ background: 'transparent', color: 'inherit', borderColor: 'rgba(255,255,255,.3)' }}>{tr('Strg S')}</span>
           </button>
         </div>
       </div>

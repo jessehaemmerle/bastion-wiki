@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { hljs } from '../lib/highlight.js';
 import { slugify } from '../lib/slug.js';
+import { tr } from '../lib/i18n.js';
 
 const PURIFY = {
   ADD_ATTR: ['data-type', 'data-variant', 'data-checked', 'data-language', 'target', 'colwidth'],
@@ -61,12 +62,12 @@ export default function ContentView({ html, onHeadings, onToggleTask, className 
       } catch { /* ignore highlighting errors */ }
       const tools = document.createElement('div');
       tools.className = 'code-tools';
-      const copyBtn = button('Kopieren', async () => {
+      const copyBtn = button(tr('Kopieren'), async () => {
         const text = code.textContent;
         try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
         copyBtn.classList.add('done');
-        copyBtn.lastChild.textContent = 'Kopiert';
-        setTimeout(() => { copyBtn.classList.remove('done'); copyBtn.lastChild.textContent = 'Kopieren'; }, 1400);
+        copyBtn.lastChild.textContent = tr('Kopiert');
+        setTimeout(() => { copyBtn.classList.remove('done'); copyBtn.lastChild.textContent = tr('Kopieren'); }, 1400);
       });
       tools.append(copyBtn);
       pre.append(tools);

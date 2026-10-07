@@ -9,6 +9,7 @@ import { useApp } from '../lib/context.jsx';
 import { useChrome, useFetch } from '../lib/hooks.js';
 import { diffLines, htmlToLines } from '../lib/diff.js';
 import { formatDate, timeAgo } from '../lib/format.js';
+import { tr } from '../lib/i18n.js';
 
 export default function History() {
   const { id } = useParams();
@@ -25,7 +26,7 @@ export default function History() {
   const revisions = revQ.data?.revisions || [];
 
   useChrome(
-    page ? [{ label: page.space.name, to: `/s/${page.space.key}` }, { label: page.title, to: `/p/${page.id}` }, { label: 'Versionen' }] : [{ label: '…' }],
+    page ? [{ label: page.space.name, to: `/s/${page.space.key}` }, { label: page.title, to: `/p/${page.id}` }, { label: tr('Versionen') }] : [{ label: '…' }],
     page?.space.key ?? null, page?.id ?? null,
   );
 
@@ -63,9 +64,9 @@ export default function History() {
       <div className="page-head">
         <div>
           <h1>{page.title}</h1>
-          <p>{revisions.length} Versionen gespeichert, aktuell ist Version {page.version}.</p>
+          <p>{tr('{n} Versionen gespeichert, aktuell ist Version {v}.', { n: revisions.length, v: page.version })}</p>
         </div>
-        <Link to={`/p/${page.id}`} className="btn"><Icon name="arrow-left" /> Zur Seite</Link>
+        <Link to={`/p/${page.id}`} className="btn"><Icon name="arrow-left" /> {tr('Zur Seite')}</Link>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: 20, alignItems: 'start' }} className="history-grid">
         <div className="card" style={{ position: 'sticky', top: 'calc(var(--topbar-h) + 16px)' }}>
@@ -80,8 +81,8 @@ export default function History() {
                   <Avatar name={r.author || '?'} size={28} />
                   <div className="grow">
                     <div className="row between"><strong className="mono">v{r.version}</strong><span className="faint tiny">{timeAgo(r.createdAt)}</span></div>
-                    <div className="small muted ellipsis">{r.summary || 'Keine Notiz'}</div>
-                    <div className="tiny faint">{r.author || 'Unbekannt'}, {formatDate(r.createdAt, true)}</div>
+                    <div className="small muted ellipsis">{r.summary || tr('Keine Notiz')}</div>
+                    <div className="tiny faint">{r.author || tr('Unbekannt')}, {formatDate(r.createdAt, true)}</div>
                   </div>
                 </button>
               </li>
@@ -92,14 +93,14 @@ export default function History() {
           <div className="card-header">
             <div className="row wrap">
               <div className="segmented">
-                <button className={mode === 'diff' ? 'active' : ''} onClick={() => setMode('diff')}><Icon name="git-branch" size={14} /> Änderungen</button>
-                <button className={mode === 'view' ? 'active' : ''} onClick={() => setMode('view')}><Icon name="eye" size={14} /> Ansicht</button>
+                <button className={mode === 'diff' ? 'active' : ''} onClick={() => setMode('diff')}><Icon name="git-branch" size={14} /> {tr('Änderungen')}</button>
+                <button className={mode === 'view' ? 'active' : ''} onClick={() => setMode('view')}><Icon name="eye" size={14} /> {tr('Ansicht')}</button>
               </div>
               {mode === 'diff' && (
                 <span className="small muted row">
-                  v{selected} vergleichen mit
+                  {tr('v{n} vergleichen mit', { n: selected })}
                   <select className="select sm" style={{ width: 110 }} value={compare ?? ''} onChange={(e) => setCompare(e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">(leer)</option>
+                    <option value="">{tr('(leer)')}</option>
                     {revisions.filter((r) => r.version !== selected).map((r) => <option key={r.version} value={r.version}>v{r.version}</option>)}
                   </select>
                 </span>
@@ -126,14 +127,14 @@ export default function History() {
       </div>
       {restore != null && (
         <Confirm
-          title={`Version ${restore} wiederherstellen?`}
-          message="Der Inhalt dieser Version wird als neue Version gespeichert. Es geht nichts verloren."
-          confirmLabel="Wiederherstellen"
+          title={tr('Version {n} wiederherstellen?', { n: restore })}
+          message={tr('Der Inhalt dieser Version wird als neue Version gespeichert. Es geht nichts verloren.')}
+          confirmLabel={tr('Wiederherstellen')}
           onClose={() => setRestore(null)}
           onConfirm={async () => {
             try {
               await api.post(`/pages/${id}/revisions/${restore}/restore`);
-              toast(`Version ${restore} wiederhergestellt`);
+              toast(tr('Version {n} wiederhergestellt', { n: restore }));
               refreshTree();
               navigate(`/p/${id}`);
             } catch (e) { toast(e.message, 'error'); }

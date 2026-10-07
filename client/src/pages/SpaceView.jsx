@@ -8,6 +8,7 @@ import { api, qs } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { useChrome, useFetch } from '../lib/hooks.js';
 import { ACCESS_LABELS, PAGE_TYPES, timeAgo } from '../lib/format.js';
+import { tr, trn } from '../lib/i18n.js';
 
 export default function SpaceView() {
   const { key } = useParams();
@@ -18,7 +19,7 @@ export default function SpaceView() {
   const [type, setType] = useState('');
   const [modal, setModal] = useState(null);
   const pagesQuery = useFetch(`/pages${qs({ space: key, type, limit: 100 })}`, [treeVersion]);
-  useChrome([{ label: 'Bereiche', to: '/spaces' }, { label: data?.space?.name || key }], key);
+  useChrome([{ label: tr('Bereiche'), to: '/spaces' }, { label: data?.space?.name || key }], key);
 
   useEffect(() => {
     if (params.get('settings') && data?.space?.access === 'admin') {
@@ -47,19 +48,19 @@ export default function SpaceView() {
           <h1>{space.name}</h1>
           {space.description && <p>{space.description}</p>}
           <p className="small" style={{ marginTop: 6 }}>
-            {stats.pages} Seiten, {stats.contributors} Mitwirkende, Zugriff: {ACCESS_LABELS[space.access]}
-            {stats.overdue > 0 && <>, <strong style={{ color: 'var(--text)' }}>{stats.overdue} Reviews überfällig</strong></>}
+            {`${trn(stats.pages, '1 Seite', '{n} Seiten')}, ${trn(stats.contributors, '1 Mitwirkende Person', '{n} Mitwirkende')}, ${tr('Zugriff: {a}', { a: ACCESS_LABELS[space.access] })}`}
+            {stats.overdue > 0 && <>, <strong style={{ color: 'var(--text)' }}>{tr('{n} Reviews überfällig', { n: stats.overdue })}</strong></>}
           </p>
         </div>
         <div className="row">
-          <Link to={`/search?q=${encodeURIComponent(`space:${space.key} `)}`} className="btn"><Icon name="search" size={15} /> Im Bereich suchen</Link>
-          {canWrite && <Link to={`/new?space=${space.key}`} className="btn primary"><Icon name="plus" size={15} /> Neue Seite</Link>}
+          <Link to={`/search?q=${encodeURIComponent(`space:${space.key} `)}`} className="btn"><Icon name="search" size={15} /> {tr('Im Bereich suchen')}</Link>
+          {canWrite && <Link to={`/new?space=${space.key}`} className="btn primary"><Icon name="plus" size={15} /> {tr('Neue Seite')}</Link>}
           {isAdmin && (
-            <Dropdown trigger={({ toggle }) => <button className="btn icon" onClick={toggle} aria-label="Bereich verwalten"><Icon name="settings" size={16} /></button>}>
-              <MenuItem icon="edit" onClick={() => setModal('edit')}>Bereich bearbeiten</MenuItem>
-              <MenuItem icon="shield" onClick={() => setModal('perms')}>Berechtigungen</MenuItem>
+            <Dropdown trigger={({ toggle }) => <button className="btn icon" onClick={toggle} aria-label={tr('Bereich verwalten')}><Icon name="settings" size={16} /></button>}>
+              <MenuItem icon="edit" onClick={() => setModal('edit')}>{tr('Bereich bearbeiten')}</MenuItem>
+              <MenuItem icon="shield" onClick={() => setModal('perms')}>{tr('Berechtigungen')}</MenuItem>
               <div className="menu-sep" />
-              <MenuItem icon="trash" danger onClick={() => setModal('delete')}>Bereich löschen</MenuItem>
+              <MenuItem icon="trash" danger onClick={() => setModal('delete')}>{tr('Bereich löschen')}</MenuItem>
             </Dropdown>
           )}
         </div>
@@ -67,7 +68,7 @@ export default function SpaceView() {
 
       {roots.length > 0 && (
         <>
-          <div className="section-title" style={{ marginTop: 8 }}><h3>Oberste Ebene</h3></div>
+          <div className="section-title" style={{ marginTop: 8 }}><h3>{tr('Oberste Ebene')}</h3></div>
           <div className="children-grid" style={{ marginBottom: 28 }}>
             {roots.map((p) => (
               <Link key={p.id} to={`/p/${p.id}`} className="child-card">
@@ -82,9 +83,9 @@ export default function SpaceView() {
 
       <div className="card">
         <div className="card-header">
-          <h3>Alle Seiten</h3>
+          <h3>{tr('Alle Seiten')}</h3>
           <div className="filters" style={{ margin: 0 }}>
-            <button className={`btn sm ${!type ? 'active' : ''}`} onClick={() => setType('')}>Alle</button>
+            <button className={`btn sm ${!type ? 'active' : ''}`} onClick={() => setType('')}>{tr('Alle')}</button>
             {types.map(([t, n]) => (
               <button key={t} className={`btn sm ${type === t ? 'active' : ''}`} onClick={() => setType(t)}>
                 <Icon name={PAGE_TYPES[t]?.icon} size={13} /> {PAGE_TYPES[t]?.label || t} <span className="faint">{n}</span>
@@ -93,13 +94,13 @@ export default function SpaceView() {
           </div>
         </div>
         {data.pages.length === 0 ? (
-          <Empty icon="file-text" title="Leerer Bereich" action={canWrite && <Link to={`/new?space=${space.key}`} className="btn primary"><Icon name="plus" /> Erste Seite anlegen</Link>}>
-            Hier gibt es noch keine Seiten.
+          <Empty icon="file-text" title={tr('Leerer Bereich')} action={canWrite && <Link to={`/new?space=${space.key}`} className="btn primary"><Icon name="plus" /> {tr('Erste Seite anlegen')}</Link>}>
+            {tr('Hier gibt es noch keine Seiten.')}
           </Empty>
         ) : (
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>Titel</th><th>Typ</th><th>Tags</th><th>Geändert</th></tr></thead>
+              <thead><tr><th>{tr('Titel')}</th><th>{tr('Typ')}</th><th>{tr('Tags')}</th><th>{tr('Geändert')}</th></tr></thead>
               <tbody>
                 {(pagesQuery.data?.pages || []).map((p) => (
                   <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/p/${p.id}`)}>
@@ -120,15 +121,15 @@ export default function SpaceView() {
       {modal === 'delete' && (
         <Confirm
           danger
-          title="Bereich löschen?"
-          message={`Alle ${stats.pages} Seiten inklusive Versionen und Anhängen werden unwiderruflich gelöscht.`}
+          title={tr('Bereich löschen?')}
+          message={tr('Alle {n} Seiten inklusive Versionen und Anhängen werden unwiderruflich gelöscht.', { n: stats.pages })}
           requireText={space.key}
-          confirmLabel="Endgültig löschen"
+          confirmLabel={tr('Endgültig löschen')}
           onClose={() => setModal(null)}
           onConfirm={async () => {
             try {
               await api.del(`/spaces/${space.id}`, { confirm: space.key });
-              toast('Bereich gelöscht');
+              toast(tr('Bereich gelöscht'));
               loadSpaces();
               navigate('/spaces');
             } catch (e) { toast(e.message, 'error'); }

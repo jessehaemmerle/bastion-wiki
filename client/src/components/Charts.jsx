@@ -1,4 +1,5 @@
 import { formatDate } from '../lib/format.js';
+import { tr } from '../lib/i18n.js';
 
 /** Edits per day for the last `days` days – one series, so no legend; hover shows the value. */
 export function ActivityBars({ activity, days = 30, height = 44 }) {
@@ -13,14 +14,14 @@ export function ActivityBars({ activity, days = 30, height = 44 }) {
   const w = 100 / days;
   return (
     <figure style={{ margin: 0 }}>
-      <svg className="spark" viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" role="img" aria-label={`${total} Änderungen in ${days} Tagen`} style={{ height }}>
+      <svg className="spark" viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" role="img" aria-label={tr('{n} Änderungen in {d} Tagen', { n: total, d: days })} style={{ height }}>
         <line x1="0" x2="100" y1={height - 0.5} y2={height - 0.5} stroke="var(--border-strong)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         {series.map((x, i) => {
           const h = x.n ? Math.max(2, (x.n / max) * (height - 2)) : 0;
           return (
             <g key={x.d}>
               <rect x={i * w} y="0" width={w} height={height} fill="transparent">
-                <title>{`${formatDate(x.d)}: ${x.n} Änderung${x.n === 1 ? '' : 'en'}`}</title>
+                <title>{`${formatDate(x.d)}: ${tr(x.n === 1 ? '1 Änderung' : '{n} Änderungen', { n: x.n })}`}</title>
               </rect>
               {h > 0 && <rect x={i * w + w * 0.15} y={height - 1 - h} width={w * 0.7} height={h} fill={i === days - 1 ? 'var(--accent)' : 'var(--text-muted)'} pointerEvents="none" />}
             </g>
@@ -28,7 +29,7 @@ export function ActivityBars({ activity, days = 30, height = 44 }) {
         })}
       </svg>
       <figcaption className="row between tiny faint" style={{ marginTop: 4 }}>
-        <span>vor {days} Tagen</span><span>heute</span>
+        <span>{tr('vor {n} Tagen', { n: days })}</span><span>{tr('heute')}</span>
       </figcaption>
     </figure>
   );

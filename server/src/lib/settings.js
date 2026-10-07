@@ -2,9 +2,10 @@ import { many, query } from '../db/index.js';
 
 export const DEFAULT_SETTINGS = {
   siteName: 'Bastion',
-  tagline: 'Die Wissensbasis für dein Ops-Team',
+  tagline: process.env.DEFAULT_LANGUAGE === 'en' ? 'The knowledge base for your ops team' : 'Die Wissensbasis für dein Ops-Team',
   defaultTheme: 'rack',
   defaultMode: 'system',
+  defaultLanguage: process.env.DEFAULT_LANGUAGE === 'en' ? 'en' : 'de',
   accentColor: '',
   allowRegistration: false,
   defaultRole: 'editor',
@@ -14,7 +15,7 @@ export const DEFAULT_SETTINGS = {
   footerText: '',
 };
 
-const PUBLIC_KEYS = ['siteName', 'tagline', 'defaultTheme', 'defaultMode', 'accentColor', 'allowRegistration', 'announcement', 'customCss', 'footerText', 'reviewIntervalDays'];
+const PUBLIC_KEYS = ['siteName', 'tagline', 'defaultTheme', 'defaultMode', 'defaultLanguage', 'accentColor', 'allowRegistration', 'announcement', 'customCss', 'footerText', 'reviewIntervalDays'];
 
 let cache = null;
 

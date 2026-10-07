@@ -1,4 +1,7 @@
-const rtf = new Intl.RelativeTimeFormat('de', { numeric: 'auto' });
+import { getLanguage, getLocale, tr } from './i18n.js';
+
+const rtfCache = {};
+const rtf = () => (rtfCache[getLanguage()] ??= new Intl.RelativeTimeFormat(getLanguage(), { numeric: 'auto' }));
 const UNITS = [
   ['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60],
 ];
@@ -7,13 +10,13 @@ export function timeAgo(date) {
   if (!date) return '';
   const diff = (new Date(date).getTime() - Date.now()) / 1000;
   for (const [unit, sec] of UNITS) {
-    if (Math.abs(diff) >= sec) return rtf.format(Math.round(diff / sec), unit);
+    if (Math.abs(diff) >= sec) return rtf().format(Math.round(diff / sec), unit);
   }
-  return 'gerade eben';
+  return tr('gerade eben');
 }
 
 export const formatDate = (d, withTime = false) =>
-  d ? new Date(d).toLocaleString('de-DE', withTime
+  d ? new Date(d).toLocaleString(getLocale(), withTime
     ? { dateStyle: 'medium', timeStyle: 'short' }
     : { dateStyle: 'medium' }) : '–';
 
@@ -47,28 +50,38 @@ export function snippetParts(s) {
     part.startsWith('\u0002') ? { text: part.slice(1, -1), hit: true } : { text: part, hit: false });
 }
 
+// Labels are getters so they follow the current language
 export const PAGE_TYPES = {
-  doc: { label: 'Dokument', icon: 'file-text' },
-  runbook: { label: 'Runbook', icon: 'book-open' },
-  incident: { label: 'Incident', icon: 'siren' },
-  host: { label: 'Server / Host', icon: 'server' },
-  service: { label: 'Service', icon: 'boxes' },
-  network: { label: 'Netzwerk', icon: 'network' },
-  change: { label: 'Change', icon: 'git-pull-request' },
-  howto: { label: 'How-To', icon: 'lightbulb' },
-  checklist: { label: 'Checkliste', icon: 'list-checks' },
+  doc: { icon: 'file-text', get label() { return tr('Dokument'); } },
+  runbook: { icon: 'book-open', get label() { return tr('Runbook'); } },
+  incident: { icon: 'siren', get label() { return tr('Incident'); } },
+  host: { icon: 'server', get label() { return tr('Server / Host'); } },
+  service: { icon: 'boxes', get label() { return tr('Service'); } },
+  network: { icon: 'network', get label() { return tr('Netzwerk'); } },
+  change: { icon: 'git-pull-request', get label() { return tr('Change'); } },
+  howto: { icon: 'lightbulb', get label() { return tr('How-To'); } },
+  checklist: { icon: 'list-checks', get label() { return tr('Checkliste'); } },
 };
 
-export const ROLE_LABELS = { admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' };
-export const ACCESS_LABELS = { none: 'Kein Zugriff', read: 'Lesen', write: 'Schreiben', admin: 'Verwalten' };
+export const ROLE_LABELS = {
+  get admin() { return tr('Administrator'); },
+  get editor() { return tr('Redakteur'); },
+  get viewer() { return tr('Betrachter'); },
+};
+export const ACCESS_LABELS = {
+  get none() { return tr('Kein Zugriff'); },
+  get read() { return tr('Lesen'); },
+  get write() { return tr('Schreiben'); },
+  get admin() { return tr('Verwalten'); },
+};
 
 /** Compact timestamp for log columns: "14:32" today, "gestern", otherwise "12.09." */
 export function shortWhen(date) {
   if (!date) return '';
   const d = new Date(date);
   const now = new Date();
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
   const y = new Date(now.getTime() - 864e5);
-  if (d.toDateString() === y.toDateString()) return 'gestern';
-  return d.toLocaleDateString('de-DE', d.getFullYear() === now.getFullYear() ? { day: '2-digit', month: '2-digit' } : { day: '2-digit', month: '2-digit', year: '2-digit' });
+  if (d.toDateString() === y.toDateString()) return tr('gestern');
+  return d.toLocaleDateString(getLocale(), d.getFullYear() === now.getFullYear() ? { day: '2-digit', month: '2-digit' } : { day: '2-digit', month: '2-digit', year: '2-digit' });
 }

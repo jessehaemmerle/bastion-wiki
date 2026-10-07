@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import Icon, { PICKER_ICONS } from './Icon.jsx';
 import { snippetParts, tagHue } from '../lib/format.js';
+import { tr } from '../lib/i18n.js';
 
 export function Modal({ title, onClose, children, footer, size = '', icon }) {
   useEffect(() => {
@@ -15,7 +16,7 @@ export function Modal({ title, onClose, children, footer, size = '', icon }) {
       <div className={`modal ${size}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-head">
           <h3 className="row">{icon && <Icon name={icon} size={18} />} {title}</h3>
-          <button className="btn ghost icon sm" onClick={onClose} aria-label="Schließen"><Icon name="x" /></button>
+          <button className="btn ghost icon sm" onClick={onClose} aria-label={tr('Schließen')}><Icon name="x" /></button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
@@ -25,7 +26,7 @@ export function Modal({ title, onClose, children, footer, size = '', icon }) {
   );
 }
 
-export function Confirm({ title, message, confirmLabel = 'Bestätigen', danger, onConfirm, onClose, requireText }) {
+export function Confirm({ title, message, confirmLabel = tr('Bestätigen'), danger, onConfirm, onClose, requireText }) {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState('');
   return (
@@ -35,7 +36,7 @@ export function Confirm({ title, message, confirmLabel = 'Bestätigen', danger, 
       icon={danger ? 'alert-triangle' : 'help'}
       footer={
         <>
-          <button className="btn" onClick={onClose}>Abbrechen</button>
+          <button className="btn" onClick={onClose}>{tr('Abbrechen')}</button>
           <button
             className={`btn ${danger ? 'danger' : 'primary'}`}
             disabled={busy || (requireText && text !== requireText)}
@@ -52,7 +53,7 @@ export function Confirm({ title, message, confirmLabel = 'Bestätigen', danger, 
       <div className="muted">{message}</div>
       {requireText && (
         <div className="field">
-          <label>Zur Bestätigung <code className="mono">{requireText}</code> eingeben</label>
+          <label>{tr('Zur Bestätigung')} <code className="mono">{requireText}</code> eingeben</label>
           <input className="input" value={text} onChange={(e) => setText(e.target.value)} autoFocus />
         </div>
       )}
@@ -179,7 +180,7 @@ export function ColorPicker({ value, onChange, colors = SPACE_COLORS, allowCusto
         <button type="button" key={c} className={`swatch ${value === c ? 'active' : ''}`} style={{ background: c }} onClick={() => onChange(c)} aria-label={c} />
       ))}
       {allowCustom && (
-        <label className="swatch" style={{ background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)', position: 'relative', overflow: 'hidden' }} title="Eigene Farbe">
+        <label className="swatch" style={{ background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)', position: 'relative', overflow: 'hidden' }} title={tr('Eigene Farbe')}>
           <input type="color" value={value || '#6366f1'} onChange={(e) => onChange(e.target.value)} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
         </label>
       )}

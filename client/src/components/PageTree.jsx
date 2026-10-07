@@ -4,6 +4,7 @@ import Icon, { PageIcon } from './Icon.jsx';
 import { api } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { PAGE_TYPES } from '../lib/format.js';
+import { tr } from '../lib/i18n.js';
 
 const loadExpanded = (key) => {
   try { return new Set(JSON.parse(localStorage.getItem(`bastion.tree.${key}`) || '[]')); } catch { return new Set(); }
@@ -116,16 +117,16 @@ export default function PageTree({ spaceKey, pages, canWrite, activeId }) {
           }}
           onDrop={(e) => { e.preventDefault(); onDrop(); }}
         >
-          <button className={`tree-toggle ${open ? 'open' : ''}`} onClick={() => toggle(node.id)} style={{ visibility: hasChildren ? 'visible' : 'hidden' }} aria-label="Aufklappen">
+          <button className={`tree-toggle ${open ? 'open' : ''}`} onClick={() => toggle(node.id)} style={{ visibility: hasChildren ? 'visible' : 'hidden' }} aria-label={tr('Aufklappen')}>
             <Icon name="chevron-right" size={14} />
           </button>
           <Link to={`/p/${node.id}`} className="tree-link" title={node.title}>
             <PageIcon icon={node.icon} fallback={PAGE_TYPES[node.pageType]?.icon} size={15} />
             <span>{node.title}</span>
           </Link>
-          {overdue && <span className="tree-dot" title="Review überfällig" />}
+          {overdue && <span className="tree-dot" title={tr('Review überfällig')} />}
           {canWrite && (
-            <button className="tree-add" title="Unterseite anlegen" onClick={() => navigate(`/new?space=${spaceKey}&parent=${node.id}`)}>
+            <button className="tree-add" title={tr('Unterseite anlegen')} onClick={() => navigate(`/new?space=${spaceKey}&parent=${node.id}`)}>
               <Icon name="plus" size={14} />
             </button>
           )}
@@ -135,6 +136,6 @@ export default function PageTree({ spaceKey, pages, canWrite, activeId }) {
     );
   };
 
-  if (!roots.length) return <div className="faint small" style={{ padding: '6px 12px' }}>Noch keine Seiten.</div>;
+  if (!roots.length) return <div className="faint small" style={{ padding: '6px 12px' }}>{tr('Noch keine Seiten.')}</div>;
   return <ul className="tree">{roots.map(renderNode)}</ul>;
 }

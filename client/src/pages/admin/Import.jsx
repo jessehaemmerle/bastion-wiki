@@ -7,7 +7,7 @@ import { api } from '../../lib/api.js';
 import { useApp } from '../../lib/context.jsx';
 import { useFetch } from '../../lib/hooks.js';
 import { formatBytes, formatDate } from '../../lib/format.js';
-import { tr } from '../../lib/i18n.js';
+import { tr, trServer } from '../../lib/i18n.js';
 
 /** How to get the data out of each system – shown next to the upload form */
 const SOURCES = [
@@ -59,6 +59,13 @@ const SOURCES = [
     note: () => tr('Ordner werden zur Hierarchie, index.md/README.md zur Ordnerseite. [[Wikilinks]], Callouts und Front Matter werden erkannt.'),
   },
 ];
+
+/** Server labels are "<source label>: <file or URL>" – rebuild them in the UI language */
+function jobLabel(job) {
+  const s = SOURCES.find((x) => x.id === job.source);
+  const detail = String(job.label || '').split(': ').slice(1).join(': ');
+  return s ? `${s.name}${s.variant ? ` (${s.variant()})` : ''}${detail ? `: ${detail}` : ''}` : job.label;
+}
 
 const STATUS_LABEL = {
   analyzing: () => tr('Wird analysiert'), ready: () => tr('Bereit'), running: () => tr('Läuft'), done: () => tr('Abgeschlossen'),
@@ -114,7 +121,7 @@ function Warnings({ warnings }) {
     <details style={{ marginTop: 20 }}>
       <summary className="small" style={{ cursor: 'pointer', fontWeight: 700 }}>{tr('{n} Hinweise anzeigen', { n: warnings.length })}</summary>
       <ul className="small muted" style={{ marginTop: 8, paddingLeft: 18, maxHeight: 280, overflowY: 'auto' }}>
-        {warnings.map((w, i) => <li key={i}>{w}</li>)}
+        {warnings.map((w, i) => <li key={i}>{trServer(w)}</li>)}
       </ul>
     </details>
   );
@@ -251,7 +258,7 @@ function JobView({ id, onReset }) {
   if (!job) return <Spinner />;
   return (
     <section>
-      <div className="section-h"><h2>{job.label}</h2><span className="small muted">{STATUS_LABEL[job.status]?.()}</span></div>
+      <div className="section-h"><h2>{jobLabel(job)}</h2><span className="small muted">{STATUS_LABEL[job.status]?.()}</span></div>
       {job.status === 'analyzing' && (
         <div className="col">
           <p className="muted">{tr('Die Quelle wird gelesen und umgewandelt. Bei API-Importen kann das je nach Umfang einige Minuten dauern.')}</p>
@@ -297,7 +304,7 @@ function JobView({ id, onReset }) {
       )}
       {['failed', 'discarded'].includes(job.status) && (
         <div className="col">
-          <div className="error-box" role="alert">{job.error || tr('Der Import wurde verworfen.')}</div>
+          <div className="error-box" role="alert">{trServer(job.error) || tr('Der Import wurde verworfen.')}</div>
           <div><button className="btn" onClick={onReset}>{tr('Zurück')}</button></div>
           <Warnings warnings={job.warnings} />
         </div>
@@ -417,9 +424,9 @@ export default function Import() {
               <tbody>
                 {history.data.jobs.map((j) => (
                   <tr key={j.id} style={{ cursor: 'pointer' }} onClick={() => setJobId(j.id)}>
-                    <td className="ellipsis" style={{ maxWidth: 380 }}>{j.label}</td>
+                    <td className="ellipsis" style={{ maxWidth: 380 }}>{jobLabel(j)}</td>
                     <td>{STATUS_LABEL[j.status]?.()}</td>
-                    <td className="small">{j.status === 'done' ? tr('{c} neu, {u} aktualisiert, {s} übersprungen', { c: j.result.created, u: j.result.updated, s: j.result.skipped }) : j.error ? <span className="muted">{j.error}</span> : ''}</td>
+                    <td className="small">{j.status === 'done' ? tr('{c} neu, {u} aktualisiert, {s} übersprungen', { c: j.result.created, u: j.result.updated, s: j.result.skipped }) : j.error ? <span className="muted">{trServer(j.error)}</span> : ''}</td>
                     <td className="small">{j.createdBy}</td>
                     <td className="small nowrap">{formatDate(j.createdAt, true)}</td>
                   </tr>

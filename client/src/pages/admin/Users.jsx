@@ -5,6 +5,7 @@ import { api, qs } from '../../lib/api.js';
 import { useApp } from '../../lib/context.jsx';
 import { useFetch } from '../../lib/hooks.js';
 import { ROLE_LABELS, timeAgo } from '../../lib/format.js';
+import { tr } from '../../lib/i18n.js';
 
 function UserModal({ user, groups, onClose, onSaved }) {
   const { toast } = useApp();
@@ -24,42 +25,42 @@ function UserModal({ user, groups, onClose, onSaved }) {
       } else {
         await api.post('/admin/users', { ...body, username: f.username, password: f.password, email: f.email || undefined });
       }
-      toast(user ? 'Benutzer gespeichert' : 'Benutzer angelegt');
+      toast(user ? tr('Benutzer gespeichert') : tr('Benutzer angelegt'));
       onSaved();
       onClose();
     } catch (e) { toast(e.message, 'error'); }
   };
   const genPw = () => set('password', Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 56]).join(''));
   return (
-    <Modal title={user ? `${user.username} bearbeiten` : 'Neuer Benutzer'} icon="user" size="lg" onClose={onClose}
-      footer={<><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" onClick={save}><Icon name="save" /> Speichern</button></>}>
+    <Modal title={user ? tr('{name} bearbeiten', { name: user.username }) : tr('Neuer Benutzer')} icon="user" size="lg" onClose={onClose}
+      footer={<><button className="btn" onClick={onClose}>{tr('Abbrechen')}</button><button className="btn primary" onClick={save}><Icon name="save" /> {tr('Speichern')}</button></>}>
       <div className="form-grid">
-        <div className="field"><label>Benutzername</label><input className="input mono" value={f.username} disabled={!!user} onChange={(e) => set('username', e.target.value)} autoFocus={!user} /></div>
-        <div className="field"><label>Anzeigename</label><input className="input" value={f.displayName} onChange={(e) => set('displayName', e.target.value)} /></div>
-        <div className="field"><label>E-Mail</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
+        <div className="field"><label>{tr('Benutzername')}</label><input className="input mono" value={f.username} disabled={!!user} onChange={(e) => set('username', e.target.value)} autoFocus={!user} /></div>
+        <div className="field"><label>{tr('Anzeigename')}</label><input className="input" value={f.displayName} onChange={(e) => set('displayName', e.target.value)} /></div>
+        <div className="field"><label>{tr('E-Mail')}</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
       </div>
       <div className="field">
-        <label>Rolle</label>
+        <label>{tr('Rolle')}</label>
         <div className="segmented">
           {['admin', 'editor', 'viewer'].map((r) => <button key={r} className={f.role === r ? 'active' : ''} onClick={() => set('role', r)}>{ROLE_LABELS[r]}</button>)}
         </div>
         <span className="hint">
-          {f.role === 'admin' && 'Vollzugriff auf alle Bereiche und das Admin-Panel.'}
-          {f.role === 'editor' && 'Kann Bereiche anlegen und in freigegebenen Bereichen schreiben.'}
-          {f.role === 'viewer' && 'Kann nur lesen – auch wenn ein Bereich Schreibrechte vergibt.'}
+          {f.role === 'admin' && tr('Vollzugriff auf alle Bereiche und die Administration.')}
+          {f.role === 'editor' && tr('Kann Bereiche anlegen und in freigegebenen Bereichen schreiben.')}
+          {f.role === 'viewer' && tr('Kann nur lesen – auch wenn ein Bereich Schreibrechte vergibt.')}
         </span>
       </div>
       <div className="field">
-        <label>{user ? 'Neues Passwort (leer lassen = unverändert)' : 'Passwort'}</label>
+        <label>{user ? tr('Neues Passwort (leer lassen = unverändert)') : tr('Passwort')}</label>
         <div className="row">
-          <input className="input mono" value={f.password} onChange={(e) => set('password', e.target.value)} placeholder="mind. 8 Zeichen" />
-          <button className="btn" type="button" onClick={genPw} title="Zufällig generieren"><Icon name="wand" /></button>
+          <input className="input mono" value={f.password} onChange={(e) => set('password', e.target.value)} placeholder={tr('mind. 8 Zeichen')} />
+          <button className="btn" type="button" onClick={genPw} title={tr('Zufällig generieren')}><Icon name="wand" /></button>
         </div>
       </div>
       <div className="field">
-        <label>Gruppen</label>
+        <label>{tr('Gruppen')}</label>
         <div className="row wrap">
-          {groups.length === 0 && <span className="faint small">Noch keine Gruppen angelegt.</span>}
+          {groups.length === 0 && <span className="faint small">{tr('Noch keine Gruppen angelegt.')}</span>}
           {groups.map((g) => (
             <label key={g.id} className={`btn sm ${f.groupIds.includes(g.id) ? 'active' : ''}`}>
               <input type="checkbox" hidden checked={f.groupIds.includes(g.id)} onChange={(e) => set('groupIds', e.target.checked ? [...f.groupIds, g.id] : f.groupIds.filter((x) => x !== g.id))} />
@@ -68,7 +69,7 @@ function UserModal({ user, groups, onClose, onSaved }) {
           ))}
         </div>
       </div>
-      {user && <Switch checked={f.isActive} onChange={(v) => set('isActive', v)} label="Konto aktiv" />}
+      {user && <Switch checked={f.isActive} onChange={(v) => set('isActive', v)} label={tr('Konto aktiv')} />}
     </Modal>
   );
 }
@@ -83,35 +84,35 @@ export default function Users() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Benutzer</h1><p>Konten, Rollen und Gruppenzugehörigkeit verwalten.</p></div>
-        <button className="btn primary" onClick={() => setEdit({})}><Icon name="user-plus" /> Benutzer anlegen</button>
+        <div><h1>{tr('Benutzer')}</h1><p>{tr('Konten, Rollen und Gruppenzugehörigkeit verwalten.')}</p></div>
+        <button className="btn primary" onClick={() => setEdit({})}><Icon name="user-plus" /> {tr('Benutzer anlegen')}</button>
       </div>
       <div className="card">
         <div className="card-header">
-          <div className="input-icon" style={{ maxWidth: 320, width: '100%' }}><Icon name="search" /><input className="input sm" placeholder="Suchen …" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-          <span className="faint small">{data?.users.length ?? 0} Benutzer</span>
+          <div className="input-icon" style={{ maxWidth: 320, width: '100%' }}><Icon name="search" /><input className="input sm" placeholder={tr('Suchen …')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <span className="faint small">{tr('{n} Benutzer', { n: data?.users.length ?? 0 })}</span>
         </div>
         {loading && !data ? <Spinner /> : (
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>Benutzer</th><th>Rolle</th><th>Gruppen</th><th>Status</th><th>Letzter Login</th><th>Edits</th><th /></tr></thead>
+              <thead><tr><th>{tr('Benutzer')}</th><th>{tr('Rolle')}</th><th>{tr('Gruppen')}</th><th>{tr('Status')}</th><th>{tr('Letzter Login')}</th><th>{tr('Edits')}</th><th /></tr></thead>
               <tbody>
                 {data.users.map((u) => (
                   <tr key={u.id}>
                     <td><div className="row"><Avatar name={u.displayName} size={30} /><div><div style={{ fontWeight: 600 }}>{u.displayName}</div><div className="small muted">{u.username}{u.email ? `, ${u.email}` : ''}</div></div></div></td>
                     <td><span className={`badge ${u.role === 'admin' ? 'accent' : ''}`}>{ROLE_LABELS[u.role]}</span></td>
                     <td><div className="row wrap" style={{ gap: 4 }}>{u.groups.map((g) => <span key={g} className="badge">{g}</span>)}</div></td>
-                    <td>{u.isActive ? <span className="badge success">aktiv</span> : <span className="badge danger">deaktiviert</span>}</td>
-                    <td className="small faint nowrap">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : 'nie'}</td>
+                    <td>{u.isActive ? <span className="badge success">{tr('aktiv')}</span> : <span className="badge danger">{tr('deaktiviert')}</span>}</td>
+                    <td className="small faint nowrap">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : tr('nie')}</td>
                     <td className="mono small">{u.edits}</td>
                     <td className="actions">
-                      <Dropdown trigger={({ toggle }) => <button className="btn ghost icon sm" onClick={toggle} aria-label="Aktionen"><Icon name="more" size={15} /></button>}>
-                        <MenuItem icon="edit" onClick={() => setEdit(u)}>Bearbeiten</MenuItem>
-                        <MenuItem icon="log-out" onClick={async () => { await api.del(`/admin/users/${u.id}/sessions`); toast('Alle Sitzungen beendet'); }}>Abmelden erzwingen</MenuItem>
+                      <Dropdown trigger={({ toggle }) => <button className="btn ghost icon sm" onClick={toggle} aria-label={tr('Aktionen')}><Icon name="more" size={15} /></button>}>
+                        <MenuItem icon="edit" onClick={() => setEdit(u)}>{tr('Bearbeiten')}</MenuItem>
+                        <MenuItem icon="log-out" onClick={async () => { await api.del(`/admin/users/${u.id}/sessions`); toast(tr('Alle Sitzungen beendet')); }}>{tr('Abmelden erzwingen')}</MenuItem>
                         {u.id !== me.id && <MenuItem icon={u.isActive ? 'lock' : 'check'} onClick={async () => {
                           try { await api.patch(`/admin/users/${u.id}`, { isActive: !u.isActive }); reload(); } catch (e) { toast(e.message, 'error'); }
-                        }}>{u.isActive ? 'Deaktivieren' : 'Aktivieren'}</MenuItem>}
-                        {u.id !== me.id && <><div className="menu-sep" /><MenuItem icon="trash" danger onClick={() => setDel(u)}>Löschen</MenuItem></>}
+                        }}>{u.isActive ? tr('Deaktivieren') : tr('Aktivieren')}</MenuItem>}
+                        {u.id !== me.id && <><div className="menu-sep" /><MenuItem icon="trash" danger onClick={() => setDel(u)}>{tr('Löschen')}</MenuItem></>}
                       </Dropdown>
                     </td>
                   </tr>
@@ -123,8 +124,8 @@ export default function Users() {
       </div>
       {edit && groups.data && <UserModal user={edit.id ? edit : null} groups={groups.data.groups} onClose={() => setEdit(null)} onSaved={() => { reload(); groups.reload(); }} />}
       {del && (
-        <Confirm danger title="Benutzer löschen?" message={`@${del.username} wird gelöscht. Seiten bleiben erhalten, verlieren aber die Autorenzuordnung.`} confirmLabel="Löschen" onClose={() => setDel(null)}
-          onConfirm={async () => { try { await api.del(`/admin/users/${del.id}`); toast('Benutzer gelöscht'); reload(); } catch (e) { toast(e.message, 'error'); } }} />
+        <Confirm danger title={tr('Benutzer löschen?')} message={tr('{name} wird gelöscht. Seiten bleiben erhalten, verlieren aber die Autorenzuordnung.', { name: del.username })} confirmLabel={tr('Löschen')} onClose={() => setDel(null)}
+          onConfirm={async () => { try { await api.del(`/admin/users/${del.id}`); toast(tr('Benutzer gelöscht')); reload(); } catch (e) { toast(e.message, 'error'); } }} />
       )}
     </>
   );

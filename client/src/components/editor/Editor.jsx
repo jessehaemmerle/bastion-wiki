@@ -17,6 +17,7 @@ import { Callout } from './Callout.js';
 import { SlashCommand } from './SlashCommand.js';
 import CodeBlockView from './CodeBlockView.jsx';
 import Icon from '../Icon.jsx';
+import { tr } from '../../lib/i18n.js';
 
 const CodeBlock = CodeBlockLowlight.extend({
   addNodeView() {
@@ -58,7 +59,7 @@ function Toolbar({ editor, onPickImage }) {
   const c = () => editor.chain().focus();
   const setLink = () => {
     const prev = editor.getAttributes('link').href || '';
-    const url = window.prompt('Link-Adresse (URL oder /p/<id>)', prev);
+    const url = window.prompt(tr('Link-Adresse (URL oder /p/<id>)'), prev);
     if (url === null) return;
     if (!url) return c().extendMarkRange('link').unsetLink().run();
     c().extendMarkRange('link').setLink({ href: url }).run();
@@ -66,7 +67,7 @@ function Toolbar({ editor, onPickImage }) {
 
   return (
     <div className="toolbar">
-      <Btn icon="undo" label="Rückgängig (Strg+Z)" disabled={!s.canUndo} onClick={() => c().undo().run()} />
+      <Btn icon="undo" label={tr('Rückgängig (Strg+Z)')} disabled={!s.canUndo} onClick={() => c().undo().run()} />
       <span className="tb-sep" />
       <select
         className="tb-select"
@@ -76,50 +77,50 @@ function Toolbar({ editor, onPickImage }) {
           if (v === 'p') c().setParagraph().run();
           else c().setHeading({ level: Number(v[1]) }).run();
         }}
-        aria-label="Absatzformat"
+        aria-label={tr('Absatzformat')}
       >
-        <option value="p">Text</option>
-        <option value="h1">Überschrift 1</option>
-        <option value="h2">Überschrift 2</option>
-        <option value="h3">Überschrift 3</option>
-        <option value="h4">Überschrift 4</option>
+        <option value="p">{tr('Text')}</option>
+        <option value="h1">{tr('Überschrift 1')}</option>
+        <option value="h2">{tr('Überschrift 2')}</option>
+        <option value="h3">{tr('Überschrift 3')}</option>
+        <option value="h4">{tr('Überschrift 4')}</option>
       </select>
       <span className="tb-sep" />
-      <Btn label="Fett (Strg+B)" active={s.bold} onClick={() => c().toggleBold().run()}><b>B</b></Btn>
-      <Btn label="Kursiv (Strg+I)" active={s.italic} onClick={() => c().toggleItalic().run()}><i style={{ fontFamily: 'serif' }}>I</i></Btn>
-      <Btn label="Unterstrichen (Strg+U)" active={s.underline} onClick={() => c().toggleUnderline().run()}><u>U</u></Btn>
-      <Btn label="Durchgestrichen" active={s.strike} onClick={() => c().toggleStrike().run()}><s>S</s></Btn>
-      <Btn icon="code" label="Inline-Code (Strg+E)" active={s.code} onClick={() => c().toggleCode().run()} />
-      <Btn icon="brush" label="Markieren" active={s.highlight} onClick={() => c().toggleHighlight().run()} />
-      <Btn icon="link" label="Link" active={s.link} onClick={setLink} />
-      <Btn label="Tiefgestellt" active={s.sub} onClick={() => c().toggleSubscript().run()}>x<sub>2</sub></Btn>
-      <Btn label="Hochgestellt" active={s.sup} onClick={() => c().toggleSuperscript().run()}>x<sup>2</sup></Btn>
+      <Btn label={tr('Fett (Strg+B)')} active={s.bold} onClick={() => c().toggleBold().run()}><b>B</b></Btn>
+      <Btn label={tr('Kursiv (Strg+I)')} active={s.italic} onClick={() => c().toggleItalic().run()}><i style={{ fontFamily: 'serif' }}>I</i></Btn>
+      <Btn label={tr('Unterstrichen (Strg+U)')} active={s.underline} onClick={() => c().toggleUnderline().run()}><u>U</u></Btn>
+      <Btn label={tr('Durchgestrichen')} active={s.strike} onClick={() => c().toggleStrike().run()}><s>S</s></Btn>
+      <Btn icon="code" label={tr('Inline-Code (Strg+E)')} active={s.code} onClick={() => c().toggleCode().run()} />
+      <Btn icon="brush" label={tr('Markieren')} active={s.highlight} onClick={() => c().toggleHighlight().run()} />
+      <Btn icon="link" label={tr('Link')} active={s.link} onClick={setLink} />
+      <Btn label={tr('Tiefgestellt')} active={s.sub} onClick={() => c().toggleSubscript().run()}>x<sub>2</sub></Btn>
+      <Btn label={tr('Hochgestellt')} active={s.sup} onClick={() => c().toggleSuperscript().run()}>x<sup>2</sup></Btn>
       <span className="tb-sep" />
-      <Btn label="Aufzählung" active={s.bullet} onClick={() => c().toggleBulletList().run()}>•≡</Btn>
-      <Btn label="Nummerierte Liste" active={s.ordered} onClick={() => c().toggleOrderedList().run()}>1≡</Btn>
-      <Btn icon="clipboard-check" label="Checkliste" active={s.task} onClick={() => c().toggleTaskList().run()} />
+      <Btn label={tr('Aufzählung')} active={s.bullet} onClick={() => c().toggleBulletList().run()}>•≡</Btn>
+      <Btn label={tr('Nummerierte Liste')} active={s.ordered} onClick={() => c().toggleOrderedList().run()}>1≡</Btn>
+      <Btn icon="clipboard-check" label={tr('Checkliste')} active={s.task} onClick={() => c().toggleTaskList().run()} />
       <span className="tb-sep" />
-      <Btn icon="square-terminal" label="Codeblock" active={s.codeBlock} onClick={() => c().toggleCodeBlock({ language: 'bash' }).run()} />
-      <Btn icon="message" label="Zitat" active={s.quote} onClick={() => c().toggleBlockquote().run()} />
-      <Btn icon="info" label="Info-Box" active={s.callout} onClick={() => c().toggleCallout('info').run()} />
-      <Btn icon="alert-triangle" label="Warnung" onClick={() => c().toggleCallout('warning').run()} />
-      <Btn icon="flame" label="Gefahr" onClick={() => c().toggleCallout('danger').run()} />
-      <Btn icon="grid" label="Tabelle einfügen" active={s.table} onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
-      <Btn icon="upload" label="Bild einfügen" onClick={onPickImage} />
-      <Btn icon="more" label="Trennlinie" onClick={() => c().setHorizontalRule().run()} />
+      <Btn icon="square-terminal" label={tr('Codeblock')} active={s.codeBlock} onClick={() => c().toggleCodeBlock({ language: 'bash' }).run()} />
+      <Btn icon="message" label={tr('Zitat')} active={s.quote} onClick={() => c().toggleBlockquote().run()} />
+      <Btn icon="info" label={tr('Info-Box')} active={s.callout} onClick={() => c().toggleCallout('info').run()} />
+      <Btn icon="alert-triangle" label={tr('Warnung')} onClick={() => c().toggleCallout('warning').run()} />
+      <Btn icon="flame" label={tr('Gefahr')} onClick={() => c().toggleCallout('danger').run()} />
+      <Btn icon="grid" label={tr('Tabelle einfügen')} active={s.table} onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
+      <Btn icon="upload" label={tr('Bild einfügen')} onClick={onPickImage} />
+      <Btn icon="more" label={tr('Trennlinie')} onClick={() => c().setHorizontalRule().run()} />
       <span className="tb-sep" />
-      <Btn label="Linksbündig" active={!s.alignCenter && !s.alignRight} onClick={() => c().setTextAlign('left').run()}>⟸</Btn>
-      <Btn label="Zentriert" active={s.alignCenter} onClick={() => c().setTextAlign('center').run()}>⟺</Btn>
-      <Btn label="Rechtsbündig" active={s.alignRight} onClick={() => c().setTextAlign('right').run()}>⟹</Btn>
+      <Btn label={tr('Linksbündig')} active={!s.alignCenter && !s.alignRight} onClick={() => c().setTextAlign('left').run()}>⟸</Btn>
+      <Btn label={tr('Zentriert')} active={s.alignCenter} onClick={() => c().setTextAlign('center').run()}>⟺</Btn>
+      <Btn label={tr('Rechtsbündig')} active={s.alignRight} onClick={() => c().setTextAlign('right').run()}>⟹</Btn>
       {s.table && (
         <>
           <span className="tb-sep" />
-          <Btn label="Zeile darunter" onClick={() => c().addRowAfter().run()}>+Z</Btn>
-          <Btn label="Spalte rechts" onClick={() => c().addColumnAfter().run()}>+S</Btn>
-          <Btn label="Zeile löschen" onClick={() => c().deleteRow().run()}>−Z</Btn>
-          <Btn label="Spalte löschen" onClick={() => c().deleteColumn().run()}>−S</Btn>
-          <Btn label="Kopfzeile umschalten" onClick={() => c().toggleHeaderRow().run()}>H</Btn>
-          <Btn icon="trash" label="Tabelle löschen" onClick={() => c().deleteTable().run()} />
+          <Btn label={tr('Zeile darunter')} onClick={() => c().addRowAfter().run()}>+Z</Btn>
+          <Btn label={tr('Spalte rechts')} onClick={() => c().addColumnAfter().run()}>+S</Btn>
+          <Btn label={tr('Zeile löschen')} onClick={() => c().deleteRow().run()}>−Z</Btn>
+          <Btn label={tr('Spalte löschen')} onClick={() => c().deleteColumn().run()}>−S</Btn>
+          <Btn label={tr('Kopfzeile umschalten')} onClick={() => c().toggleHeaderRow().run()}>H</Btn>
+          <Btn icon="trash" label={tr('Tabelle löschen')} onClick={() => c().deleteTable().run()} />
         </>
       )}
     </div>
@@ -130,7 +131,7 @@ function Toolbar({ editor, onPickImage }) {
  * WYSIWYG editor.
  * `onUpload(files)` must return [{ url, filename, mimeType }]. If missing, images are embedded as data URLs.
  */
-export default function Editor({ content, onChange, onUpload, placeholder = 'Schreibe los … oder tippe „/“ für Blöcke', onSaveShortcut }) {
+export default function Editor({ content, onChange, onUpload, placeholder, onSaveShortcut }) {
   const fileRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const uploadRef = useRef(onUpload);
@@ -176,7 +177,7 @@ export default function Editor({ content, onChange, onUpload, placeholder = 'Sch
       TaskItem.configure({ nested: true }),
       Highlight,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({ placeholder: placeholder || tr('Schreibe los … oder tippe „/“ für Blöcke') }),
       CharacterCount,
       Typography,
       Subscript,
@@ -230,12 +231,12 @@ export default function Editor({ content, onChange, onUpload, placeholder = 'Sch
       <Toolbar editor={editor} onPickImage={() => fileRef.current?.click()} />
       <BubbleMenu editor={editor} shouldShow={({ editor: e, state }) => !state.selection.empty && !e.isActive('codeBlock') && !e.isActive('image')}>
         <div className="bubble">
-          <Btn label="Fett" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></Btn>
-          <Btn label="Kursiv" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></Btn>
-          <Btn icon="code" label="Code" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} />
-          <Btn icon="brush" label="Markieren" active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} />
-          <Btn icon="link" label="Link" active={editor.isActive('link')} onClick={() => {
-            const url = window.prompt('Link-Adresse', editor.getAttributes('link').href || '');
+          <Btn label={tr('Fett')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></Btn>
+          <Btn label={tr('Kursiv')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></Btn>
+          <Btn icon="code" label={tr('Code')} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} />
+          <Btn icon="brush" label={tr('Markieren')} active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} />
+          <Btn icon="link" label={tr('Link')} active={editor.isActive('link')} onClick={() => {
+            const url = window.prompt(tr('Link-Adresse'), editor.getAttributes('link').href || '');
             if (url === null) return;
             if (!url) editor.chain().focus().unsetLink().run();
             else editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
@@ -244,10 +245,10 @@ export default function Editor({ content, onChange, onUpload, placeholder = 'Sch
       </BubbleMenu>
       <EditorContent editor={editor} />
       <div className="row between faint tiny mono" style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-        <span>„/“ fügt Blöcke ein. Bilder per Drag & Drop oder Einfügen. Strg+S speichert.</span>
-        <span>{words} Wörter</span>
+        <span>{tr('„/“ fügt Blöcke ein. Bilder per Drag & Drop oder Einfügen. Strg+S speichert.')}</span>
+        <span>{tr('{n} Wörter', { n: words })}</span>
       </div>
-      {dragging && <div className="drop-hint">Dateien hier ablegen</div>}
+      {dragging && <div className="drop-hint">{tr('Dateien hier ablegen')}</div>}
       <input
         ref={fileRef}
         type="file"

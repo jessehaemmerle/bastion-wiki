@@ -145,3 +145,10 @@
 .ProseMirror .code-wrap pre::after { content: ''; }
 
 .drop-hint { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--surface) 85%, transparent); border: 2px dashed var(--text-muted); z-index: 20; font-weight: 700; pointer-events: none; }
+
+/* callout labels in English */
+:root:lang(en) .prose div[data-type='callout']::before { content: 'Note'; }
+:root:lang(en) .prose div[data-type='callout'][data-variant='warning']::before { content: 'Caution'; }
+:root:lang(en) .prose div[data-type='callout'][data-variant='danger']::before { content: 'Danger'; }
+:root:lang(en) .prose div[data-type='callout'][data-variant='success']::before { content: 'Done'; }
+:root:lang(en) .prose div[data-type='callout'][data-variant='tip']::before { content: 'Tip'; }

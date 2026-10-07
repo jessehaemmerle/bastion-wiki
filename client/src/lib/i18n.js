@@ -56,3 +56,6 @@ export function trServer(msg) {
 }
 
 current = setLanguage(detectLanguage());
+
+/** Singular/plural: trn(n, '1 Seite', '{n} Seiten') */
+export const trn = (n, one, many, vars = {}) => tr(Number(n) === 1 ? one : many, { n, ...vars });

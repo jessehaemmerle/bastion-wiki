@@ -6,6 +6,7 @@ import { Spinner } from '../../components/ui.jsx';
 import { useApp } from '../../lib/context.jsx';
 import { useFetch } from '../../lib/hooks.js';
 import { ACCESS_LABELS, timeAgo } from '../../lib/format.js';
+import { tr } from '../../lib/i18n.js';
 
 export default function AdminSpaces() {
   const { loadSpaces } = useApp();
@@ -16,14 +17,14 @@ export default function AdminSpaces() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Bereiche & Berechtigungen</h1><p>Alle Bereiche – auch solche, in denen du selbst nicht Mitglied bist.</p></div>
-        <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> Bereich anlegen</button>
+        <div><h1>{tr('Bereiche & Berechtigungen')}</h1><p>{tr('Alle Bereiche – auch solche, in denen du selbst nicht Mitglied bist.')}</p></div>
+        <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> {tr('Bereich anlegen')}</button>
       </div>
       <div className="card">
         {loading ? <Spinner /> : (
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>Bereich</th><th>Schlüssel</th><th>Standardzugriff</th><th>Explizite Rechte</th><th>Seiten</th><th>Aktivität</th><th /></tr></thead>
+              <thead><tr><th>{tr('Bereich')}</th><th>{tr('Schlüssel')}</th><th>{tr('Standardzugriff')}</th><th>{tr('Explizite Rechte')}</th><th>{tr('Seiten')}</th><th>{tr('Aktivität')}</th><th /></tr></thead>
               <tbody>
                 {data.spaces.map((s) => (
                   <tr key={s.id}>
@@ -34,8 +35,8 @@ export default function AdminSpaces() {
                     <td className="mono small">{s.pageCount}</td>
                     <td className="small faint">{s.updatedAt ? timeAgo(s.updatedAt) : '—'}</td>
                     <td className="actions">
-                      <button className="btn sm" onClick={() => setPerms(s)}><Icon name="shield" size={14} /> Rechte</button>{' '}
-                      <button className="btn ghost icon sm" onClick={() => setEdit(s)} aria-label="Bearbeiten"><Icon name="edit" size={14} /></button>
+                      <button className="btn sm" onClick={() => setPerms(s)}><Icon name="shield" size={14} /> {tr('Rechte')}</button>{' '}
+                      <button className="btn ghost icon sm" onClick={() => setEdit(s)} aria-label={tr('Bearbeiten')}><Icon name="edit" size={14} /></button>
                     </td>
                   </tr>
                 ))}
@@ -45,12 +46,12 @@ export default function AdminSpaces() {
         )}
       </div>
       <div className="card pad" style={{ marginTop: 18 }}>
-        <div className="eyebrow" style={{ marginBottom: 8 }}>So funktionieren Berechtigungen</div>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>{tr('So funktionieren Berechtigungen')}</div>
         <ul className="small muted" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
-          <li><strong>Standardzugriff</strong> gilt für jede angemeldete Person (Kein Zugriff / Lesen / Schreiben).</li>
-          <li><strong>Explizite Rechte</strong> für Personen oder Gruppen erweitern den Zugriff: Lesen, Schreiben oder Verwalten.</li>
-          <li>Es gilt immer die <strong>höchste</strong> Stufe. Rolle <em>Betrachter</em> ist global auf Lesen begrenzt, <em>Administratoren</em> haben immer Vollzugriff.</li>
-          <li>„Verwalten“ erlaubt Bereichseinstellungen, Rechtevergabe und Löschen.</li>
+          <li>{tr('Der Standardzugriff gilt für jede angemeldete Person: kein Zugriff, Lesen oder Schreiben.')}</li>
+          <li>{tr('Explizite Rechte für Personen oder Gruppen erweitern den Zugriff: Lesen, Schreiben oder Verwalten.')}</li>
+          <li>{tr('Es gilt immer die höchste Stufe. Die Rolle „Betrachter“ ist global auf Lesen begrenzt, Administratoren haben immer Vollzugriff.')}</li>
+          <li>{tr('„Verwalten“ erlaubt Bereichseinstellungen, Rechtevergabe und Löschen.')}</li>
         </ul>
       </div>
       {edit && <SpaceFormModal space={edit.id ? edit : null} onClose={() => setEdit(null)} onSaved={done} />}

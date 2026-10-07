@@ -10,7 +10,7 @@ router.use(requireAuth);
 
 const map = (t) => ({
   id: t.id, name: t.name, description: t.description, icon: t.icon, pageType: t.page_type,
-  content: t.content, properties: t.properties, tags: t.tags, sortOrder: t.sort_order, isBuiltin: t.is_builtin,
+  content: t.content, properties: t.properties, tags: t.tags, sortOrder: t.sort_order, isBuiltin: t.is_builtin, language: t.language,
   updatedAt: t.updated_at,
 });
 
@@ -23,20 +23,25 @@ const schema = {
   properties: { type: 'object' },
   tags: { type: 'array' },
   sortOrder: { type: 'int' },
+  language: { type: 'string', enum: ['de', 'en'], nullable: true },
 };
 
-router.get('/templates', async (_req, res) => {
-  const rows = await many('SELECT * FROM templates ORDER BY sort_order, name');
+router.get('/templates', async (req, res) => {
+  // ?lang=en → built-in templates of that language plus language-neutral ones
+  const lang = ['de', 'en'].includes(req.query.lang) ? req.query.lang : null;
+  const rows = lang
+    ? await many('SELECT * FROM templates WHERE language IS NULL OR language=$1 ORDER BY sort_order, name', [lang])
+    : await many('SELECT * FROM templates ORDER BY language NULLS FIRST, sort_order, name');
   res.json({ templates: rows.map(map) });
 });
 
 router.post('/templates', requireRole('admin'), async (req, res) => {
   const b = pick(req.body, schema);
   const row = await one(
-    `INSERT INTO templates (name, description, icon, page_type, content, properties, tags, sort_order)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    `INSERT INTO templates (name, description, icon, page_type, content, properties, tags, sort_order, language)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
     [b.name, b.description || '', b.icon || 'file-text', b.pageType || 'doc', sanitize(b.content), b.properties || {},
-      (b.tags || []).map(String), b.sortOrder || 0],
+      (b.tags || []).map(String), b.sortOrder || 0, b.language || null],
   );
   await audit(req, 'template.create', 'template', row.id, { name: row.name });
   res.status(201).json({ template: map(row) });
@@ -48,10 +53,11 @@ router.put('/templates/:id', requireRole('admin'), async (req, res) => {
   const row = await one(
     `UPDATE templates SET name=COALESCE($2,name), description=COALESCE($3,description), icon=COALESCE($4,icon),
             page_type=COALESCE($5,page_type), content=COALESCE($6,content), properties=COALESCE($7,properties),
-            tags=COALESCE($8,tags), sort_order=COALESCE($9,sort_order), updated_at=now()
+            tags=COALESCE($8,tags), sort_order=COALESCE($9,sort_order),
+            language=CASE WHEN $10::boolean THEN $11 ELSE language END, updated_at=now()
       WHERE id=$1 RETURNING *`,
     [id, b.name, b.description, b.icon, b.pageType, b.content !== undefined ? sanitize(b.content) : null,
-      b.properties ?? null, b.tags ? b.tags.map(String) : null, b.sortOrder],
+      b.properties ?? null, b.tags ? b.tags.map(String) : null, b.sortOrder, 'language' in b, b.language ?? null],
   );
   if (!row) throw notFound();
   await audit(req, 'template.update', 'template', id, { name: row.name });

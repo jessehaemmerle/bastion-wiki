@@ -1,5 +1,6 @@
 import { THEMES } from '../lib/theme.js';
 import Icon from './Icon.jsx';
+import { tr } from '../lib/i18n.js';
 
 export function ThemeGrid({ value, onChange, mode = 'dark' }) {
   return (
@@ -21,7 +22,7 @@ export function ThemeGrid({ value, onChange, mode = 'dark' }) {
             </div>
             <div className="tc-name">
               <span>{t.name}</span>
-              {value === t.id ? <Icon name="check-circle" size={15} style={{ color: 'var(--accent)' }} /> : <span className="faint tiny">{t.desc}</span>}
+              {value === t.id ? <Icon name="check-circle" size={15} style={{ color: 'var(--accent)' }} /> : <span className="faint tiny">{tr(t.desc)}</span>}
             </div>
           </button>
         );
@@ -33,7 +34,7 @@ export function ThemeGrid({ value, onChange, mode = 'dark' }) {
 export function ModeSwitch({ value, onChange }) {
   return (
     <div className="segmented">
-      {[['light', 'sun', 'Hell'], ['dark', 'moon', 'Dunkel'], ['system', 'monitor', 'System']].map(([m, icon, label]) => (
+      {[['light', 'sun', tr('Hell')], ['dark', 'moon', tr('Dunkel')], ['system', 'monitor', tr('System')]].map(([m, icon, label]) => (
         <button key={m} type="button" className={value === m ? 'active' : ''} onClick={() => onChange(m)}>
           <Icon name={icon} size={14} /> {label}
         </button>

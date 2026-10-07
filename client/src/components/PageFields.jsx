@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Icon from './Icon.jsx';
 import { TagPill } from './ui.jsx';
 import { api } from '../lib/api.js';
+import { tr } from '../lib/i18n.js';
 
 export function TagInput({ value, onChange }) {
   const [text, setText] = useState('');
@@ -25,7 +26,7 @@ export function TagInput({ value, onChange }) {
       {value.map((t) => <TagPill key={t} name={t} onRemove={() => onChange(value.filter((x) => x !== t))} />)}
       <input
         value={text}
-        placeholder={value.length ? '' : 'Tags hinzufügen … (Enter)'}
+        placeholder={value.length ? '' : tr('Tags hinzufügen … (Enter)')}
         onFocus={() => setFocus(true)}
         onBlur={() => setTimeout(() => setFocus(false), 150)}
         onChange={(e) => { setText(e.target.value); setActive(0); }}
@@ -62,14 +63,14 @@ export function PropertiesEditor({ value, onChange }) {
     <div className="props-editor">
       {rows.map(([k, v], i) => (
         <div className="props-row" key={i}>
-          <input className="input" value={k} placeholder="Feld (z. B. IP-Adresse)" onChange={(e) => update(i, e.target.value, v)} />
-          <input className="input" value={v} placeholder="Wert" onChange={(e) => update(i, k, e.target.value)} />
-          <button type="button" className="btn ghost icon" onClick={() => onChange(Object.fromEntries(rows.filter((_, j) => j !== i)))} aria-label="Entfernen"><Icon name="x" size={15} /></button>
+          <input className="input" value={k} placeholder={tr('Feld (z. B. IP-Adresse)')} onChange={(e) => update(i, e.target.value, v)} />
+          <input className="input" value={v} placeholder={tr('Wert')} onChange={(e) => update(i, k, e.target.value)} />
+          <button type="button" className="btn ghost icon" onClick={() => onChange(Object.fromEntries(rows.filter((_, j) => j !== i)))} aria-label={tr('Entfernen')}><Icon name="x" size={15} /></button>
         </div>
       ))}
       <div className="row wrap">
-        <button type="button" className="btn sm" onClick={() => onChange({ ...value, [`Feld ${rows.length + 1}`]: '' })}><Icon name="plus" size={14} /> Eigenschaft</button>
-        {['Hostname', 'IP-Adresse', 'Verantwortlich', 'Umgebung'].filter((k) => !(k in value)).map((k) => (
+        <button type="button" className="btn sm" onClick={() => onChange({ ...value, [tr('Feld {n}', { n: rows.length + 1 })]: '' })}><Icon name="plus" size={14} /> {tr('Eigenschaft')}</button>
+        {[tr('Hostname'), tr('IP-Adresse'), tr('Verantwortlich'), tr('Umgebung')].filter((k) => !(k in value)).map((k) => (
           <button type="button" key={k} className="btn sm ghost" onClick={() => onChange({ ...value, [k]: '' })}>+ {k}</button>
         ))}
       </div>

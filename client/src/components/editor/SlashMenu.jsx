@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import Icon from '../Icon.jsx';
+import { tr } from '../../lib/i18n.js';
 
 const SlashMenu = forwardRef(function SlashMenu({ items, command }, ref) {
   const [active, setActive] = useState(0);
@@ -18,7 +19,7 @@ const SlashMenu = forwardRef(function SlashMenu({ items, command }, ref) {
     },
   }));
 
-  if (!items.length) return <div className="slash-menu"><div className="faint small" style={{ padding: 10 }}>Kein Block gefunden</div></div>;
+  if (!items.length) return <div className="slash-menu"><div className="faint small" style={{ padding: 10 }}>{tr('Kein Block gefunden')}</div></div>;
   return (
     <div className="slash-menu" ref={listRef}>
       {items.map((item, i) => (
@@ -30,8 +31,8 @@ const SlashMenu = forwardRef(function SlashMenu({ items, command }, ref) {
         >
           <span className="si-icon"><Icon name={item.icon} size={16} /></span>
           <span>
-            <div className="si-title">{item.title}</div>
-            <div className="si-desc">{item.desc}</div>
+            <div className="si-title">{tr(item.title)}</div>
+            <div className="si-desc">{tr(item.desc)}</div>
           </span>
         </button>
       ))}

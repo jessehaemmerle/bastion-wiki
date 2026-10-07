@@ -19,4 +19,5 @@ export const config = {
     email: env.ADMIN_EMAIL || null,
   },
   seedDemo: env.SEED_DEMO_CONTENT !== 'false',
+  language: env.DEFAULT_LANGUAGE === 'en' ? 'en' : 'de',
 };

@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
 import { applyTheme, onSystemModeChange, resolveTheme } from './theme.js';
 import Icon from '../components/Icon.jsx';
+import { getLanguage, setLanguage } from './i18n.js';
 
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -14,6 +15,8 @@ export function AppProvider({ children }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [treeVersion, setTreeVersion] = useState(0);
   const [online, setOnline] = useState(navigator.onLine);
+  const [lang, setLangState] = useState(getLanguage());
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const toastId = useRef(0);
 
   const toast = useCallback((message, type = 'success') => {
@@ -27,6 +30,7 @@ export function AppProvider({ children }) {
       const { settings } = await api.get('/settings/public');
       setSettings(settings);
     } catch { /* offline */ }
+    setSettingsLoaded(true);
   }, []);
 
   const loadSpaces = useCallback(async () => {
@@ -87,6 +91,18 @@ export function AppProvider({ children }) {
     document.title = settings.siteName || 'Bastion';
   }, [settings.siteName]);
 
+  // language: user preference > last choice on this device > admin default > browser.
+  // Children render only once the language is settled, so nothing re-mounts while someone types.
+  const applyLanguage = useCallback((l) => setLangState(setLanguage(l)), []);
+  let storedLang = null;
+  try { storedLang = localStorage.getItem('bastion.lang.manual'); } catch { /* ignore */ }
+  const wantedLang = user?.preferences?.language || storedLang || settings.defaultLanguage || lang;
+  const ready = settingsLoaded && user !== undefined;
+  useEffect(() => {
+    if (ready && wantedLang !== lang) applyLanguage(wantedLang);
+  }, [ready, wantedLang, lang, applyLanguage]);
+  const settled = ready && wantedLang === lang;
+
   const updatePreferences = useCallback(async (patch) => {
     // optimistic
     setUser((u) => (u ? { ...u, preferences: { ...u.preferences, ...patch } } : u));
@@ -105,14 +121,21 @@ export function AppProvider({ children }) {
     setSpaces([]);
   }, []);
 
+  const changeLanguage = useCallback((l) => {
+    try { localStorage.setItem('bastion.lang.manual', l); } catch { /* ignore */ }
+    applyLanguage(l);
+    if (user) updatePreferences({ language: l });
+  }, [applyLanguage, updatePreferences, user]);
+
   const value = {
+    lang, changeLanguage,
     user, setUser, settings, setSettings, loadSettings, spaces, loadSpaces, refreshTree, treeVersion,
     toast, paletteOpen, setPaletteOpen, themeState, updatePreferences, logout, online,
   };
 
   return (
     <AppContext.Provider value={value}>
-      {children}
+      {settled ? <Fragment key={lang}>{children}</Fragment> : <div className="loading-screen"><div className="spinner" /></div>}
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`}>

@@ -6,6 +6,7 @@ import { Snippet } from './ui.jsx';
 import { api, qs } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { PAGE_TYPES } from '../lib/format.js';
+import { tr } from '../lib/i18n.js';
 
 export default function CommandPalette() {
   const { paletteOpen, setPaletteOpen, spaces, user, updatePreferences } = useApp();
@@ -44,17 +45,17 @@ export default function CommandPalette() {
 
   const commands = useMemo(() => {
     const list = [
-      { id: 'home', title: 'Dashboard öffnen', icon: 'dashboard', run: () => go('/') },
-      { id: 'search', title: 'Erweiterte Suche', icon: 'search', run: () => go(`/search${qs({ q })}`) },
-      { id: 'tags', title: 'Alle Tags anzeigen', icon: 'tags', run: () => go('/tags') },
-      { id: 'review', title: 'Seiten mit fälligem Review', icon: 'calendar-clock', run: () => go('/review') },
-      { id: 'mode', title: 'Hell/Dunkel umschalten', icon: 'moon', run: () => { close(); updatePreferences({ mode: document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark' }); } },
-      { id: 'appearance', title: 'Theme & Darstellung', icon: 'palette', run: () => go('/settings/appearance') },
-      { id: 'tokens', title: 'API-Tokens verwalten', icon: 'key-round', run: () => go('/settings/tokens') },
+      { id: 'home', title: tr('Startseite öffnen'), icon: 'dashboard', run: () => go('/') },
+      { id: 'search', title: tr('Erweiterte Suche'), icon: 'search', run: () => go(`/search${qs({ q })}`) },
+      { id: 'tags', title: tr('Alle Tags anzeigen'), icon: 'tags', run: () => go('/tags') },
+      { id: 'review', title: tr('Seiten mit fälligem Review'), icon: 'calendar-clock', run: () => go('/review') },
+      { id: 'mode', title: tr('Hell/Dunkel umschalten'), icon: 'moon', run: () => { close(); updatePreferences({ mode: document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark' }); } },
+      { id: 'appearance', title: tr('Theme & Darstellung'), icon: 'palette', run: () => go('/settings/appearance') },
+      { id: 'tokens', title: tr('API-Tokens verwalten'), icon: 'key-round', run: () => go('/settings/tokens') },
     ];
-    if (user?.role !== 'viewer') list.unshift({ id: 'new', title: 'Neue Seite erstellen', icon: 'plus', run: () => go('/new') });
-    if (user?.role === 'admin') list.push({ id: 'admin', title: 'Admin-Panel öffnen', icon: 'shield-check', run: () => go('/admin') });
-    for (const s of spaces) list.push({ id: `space-${s.id}`, title: `Bereich: ${s.name}`, icon: s.icon, color: s.color, run: () => go(`/s/${s.key}`) });
+    if (user?.role !== 'viewer') list.unshift({ id: 'new', title: tr('Neue Seite erstellen'), icon: 'plus', run: () => go('/new') });
+    if (user?.role === 'admin') list.push({ id: 'admin', title: tr('Administration öffnen'), icon: 'shield-check', run: () => go('/admin') });
+    for (const s of spaces) list.push({ id: `space-${s.id}`, title: tr('Bereich: {name}', { name: s.name }), icon: s.icon, color: s.color, run: () => go(`/s/${s.key}`) });
     const term = q.trim().toLowerCase();
     return term ? list.filter((c) => c.title.toLowerCase().includes(term)).slice(0, 5) : list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,11 +89,11 @@ export default function CommandPalette() {
   };
 
   let lastType = null;
-  const groupLabel = { page: 'Seiten', space: 'Bereiche', tag: 'Tags', command: q ? 'Befehle' : 'Schnellzugriff' };
+  const groupLabel = { page: tr('Seiten'), space: tr('Bereiche'), tag: tr('Tags'), command: q ? tr('Befehle') : tr('Schnellzugriff') };
 
   return createPortal(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="palette" role="dialog" aria-label="Befehlspalette">
+      <div className="palette" role="dialog" aria-label={tr('Befehlspalette')}>
         <div className="palette-input">
           <Icon name="search" size={20} />
           <input
@@ -101,14 +102,14 @@ export default function CommandPalette() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Suchen oder Befehl eingeben …  (tag:  space:  type:)"
-            aria-label="Suche"
+            placeholder={tr('Suchen oder Befehl eingeben …  (tag:  space:  type:)')}
+            aria-label={tr('Suche')}
           />
-          {loading ? <div className="spinner" /> : <span className="kbd">Esc</span>}
+          {loading ? <div className="spinner" /> : <span className="kbd">{tr('Esc')}</span>}
         </div>
         <div className="palette-results" ref={listRef}>
           {results && !results.pages.length && !results.spaces.length && !results.tags.length && (
-            <div className="faint small" style={{ padding: '14px 12px' }}>Keine Treffer für „{q}“.</div>
+            <div className="faint small" style={{ padding: '14px 12px' }}>{tr('Keine Treffer für „{q}“.', { q })}</div>
           )}
           {items.map((it, i) => {
             const header = it.type !== lastType && groupLabel[it.type];
@@ -153,7 +154,7 @@ export default function CommandPalette() {
                   {it.type === 'all' && (
                     <>
                       <span className="pi-icon"><Icon name="arrow-right" /></span>
-                      <div className="pi-title">Alle Ergebnisse für „{q}“ anzeigen</div>
+                      <div className="pi-title">{tr('Alle Ergebnisse für „{q}“ anzeigen', { q })}</div>
                     </>
                   )}
                 </div>
@@ -164,7 +165,7 @@ export default function CommandPalette() {
         <div className="palette-foot">
           <span><span className="kbd">↑↓</span> navigieren</span>
           <span><span className="kbd">↵</span> öffnen</span>
-          <span><span className="kbd">tag:</span> <span className="kbd">space:</span> <span className="kbd">type:</span> filtern</span>
+          <span><span className="kbd">{tr('tag:')}</span> <span className="kbd">{tr('space:')}</span> <span className="kbd">{tr('type:')}</span> filtern</span>
         </div>
       </div>
     </div>,

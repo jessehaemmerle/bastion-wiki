@@ -5,6 +5,7 @@ import { api, qs } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { ACCESS_LABELS } from '../lib/format.js';
 import { slugify } from '../lib/slug.js';
+import { tr } from '../lib/i18n.js';
 
 export function SpaceFormModal({ space, onClose, onSaved }) {
   const { toast } = useApp();
@@ -25,7 +26,7 @@ export function SpaceFormModal({ space, onClose, onSaved }) {
     setBusy(true);
     try {
       const res = space ? await api.patch(`/spaces/${space.id}`, f) : await api.post('/spaces', f);
-      toast(space ? 'Bereich gespeichert' : 'Bereich angelegt');
+      toast(space ? tr('Bereich gespeichert') : tr('Bereich angelegt'));
       onSaved?.(res.space);
       onClose();
     } catch (err) {
@@ -37,23 +38,23 @@ export function SpaceFormModal({ space, onClose, onSaved }) {
 
   return (
     <Modal
-      title={space ? 'Bereich bearbeiten' : 'Neuer Bereich'}
+      title={space ? tr('Bereich bearbeiten') : tr('Neuer Bereich')}
       icon="grid"
       onClose={onClose}
       size="lg"
-      footer={<><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={busy || !f.name || !f.key} onClick={save}><Icon name="save" /> Speichern</button></>}
+      footer={<><button className="btn" onClick={onClose}>{tr('Abbrechen')}</button><button className="btn primary" disabled={busy || !f.name || !f.key} onClick={save}><Icon name="save" /> {tr('Speichern')}</button></>}
     >
       <form onSubmit={save} className="col" style={{ gap: 14 }}>
         <div className="row" style={{ gap: 14, alignItems: 'flex-start' }}>
           <span className="space-chip" style={{ '--sc': f.color, width: 54, height: 54, borderRadius: 14 }}><Icon name={f.icon} size={24} /></span>
           <div className="form-grid grow">
             <div className="field">
-              <label>Name</label>
+              <label>{tr('Name')}</label>
               <input className="input" value={f.name} autoFocus required maxLength={80}
                 onChange={(e) => { set('name', e.target.value); if (!keyTouched) set('key', slugify(e.target.value).slice(0, 30)); }} />
             </div>
             <div className="field">
-              <label>Schlüssel (URL)</label>
+              <label>{tr('Schlüssel (URL)')}</label>
               <input className="input mono" value={f.key} required pattern="[a-z0-9][a-z0-9-]{1,30}"
                 onChange={(e) => { setKeyTouched(true); set('key', e.target.value.toLowerCase()); }} />
               <span className="hint">/s/{f.key || 'schluessel'}</span>
@@ -61,13 +62,13 @@ export function SpaceFormModal({ space, onClose, onSaved }) {
           </div>
         </div>
         <div className="field">
-          <label>Beschreibung</label>
+          <label>{tr('Beschreibung')}</label>
           <textarea className="textarea" rows={2} value={f.description} maxLength={500} onChange={(e) => set('description', e.target.value)} />
         </div>
-        <div className="field"><label>Farbe</label><ColorPicker value={f.color} onChange={(c) => set('color', c)} /></div>
-        <div className="field"><label>Symbol</label><IconPicker value={f.icon} onChange={(i) => set('icon', i)} /></div>
+        <div className="field"><label>{tr('Farbe')}</label><ColorPicker value={f.color} onChange={(c) => set('color', c)} /></div>
+        <div className="field"><label>{tr('Symbol')}</label><IconPicker value={f.icon} onChange={(i) => set('icon', i)} /></div>
         <div className="field">
-          <label>Standardzugriff für alle angemeldeten Nutzer</label>
+          <label>{tr('Standardzugriff für alle angemeldeten Nutzer')}</label>
           <div className="segmented">
             {['none', 'read', 'write'].map((a) => (
               <button type="button" key={a} className={f.defaultAccess === a ? 'active' : ''} onClick={() => set('defaultAccess', a)}>
@@ -75,7 +76,7 @@ export function SpaceFormModal({ space, onClose, onSaved }) {
               </button>
             ))}
           </div>
-          <span className="hint">Feinere Rechte für Gruppen und Personen vergibst du unter „Berechtigungen“.</span>
+          <span className="hint">{tr('Feinere Rechte für Gruppen und Personen vergibst du unter „Berechtigungen“.')}</span>
         </div>
       </form>
     </Modal>
@@ -98,7 +99,7 @@ export function PermissionsModal({ space, onClose }) {
     return () => clearTimeout(t);
   }, [q]);
 
-  if (!data) return <Modal title="Berechtigungen" onClose={onClose}><Spinner /></Modal>;
+  if (!data) return <Modal title={tr('Berechtigungen')} onClose={onClose}><Spinner /></Modal>;
 
   const has = (type, id) => data.permissions.some((p) => p.principalType === type && p.principalId === id);
   const add = (type, item) => {
@@ -112,7 +113,7 @@ export function PermissionsModal({ space, onClose }) {
     setBusy(true);
     try {
       await api.put(`/spaces/${space.id}/permissions`, { defaultAccess: data.defaultAccess, permissions: data.permissions });
-      toast('Berechtigungen gespeichert');
+      toast(tr('Berechtigungen gespeichert'));
       onClose();
     } catch (e) {
       toast(e.message, 'error');
@@ -123,27 +124,27 @@ export function PermissionsModal({ space, onClose }) {
 
   return (
     <Modal
-      title={`Berechtigungen für ${space.name}`}
+      title={tr('Berechtigungen für {name}', { name: space.name })}
       icon="shield"
       size="lg"
       onClose={onClose}
-      footer={<><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={busy} onClick={save}><Icon name="save" /> Speichern</button></>}
+      footer={<><button className="btn" onClick={onClose}>{tr('Abbrechen')}</button><button className="btn primary" disabled={busy} onClick={save}><Icon name="save" /> {tr('Speichern')}</button></>}
     >
       <div className="field">
-        <label>Standardzugriff (alle angemeldeten Nutzer)</label>
+        <label>{tr('Standardzugriff (alle angemeldeten Nutzer)')}</label>
         <div className="segmented">
           {['none', 'read', 'write'].map((a) => (
             <button key={a} className={data.defaultAccess === a ? 'active' : ''} onClick={() => setData({ ...data, defaultAccess: a })}>{ACCESS_LABELS[a]}</button>
           ))}
         </div>
-        <span className="hint">Administratoren haben immer Vollzugriff. Betrachter (Rolle) können höchstens lesen.</span>
+        <span className="hint">{tr('Administratoren haben immer Vollzugriff. Betrachter (Rolle) können höchstens lesen.')}</span>
       </div>
 
       <div className="card">
         <table className="data">
-          <thead><tr><th>Wer</th><th>Stufe</th><th /></tr></thead>
+          <thead><tr><th>{tr('Wer')}</th><th>{tr('Stufe')}</th><th /></tr></thead>
           <tbody>
-            {data.permissions.length === 0 && <tr><td colSpan={3} className="faint">Keine expliziten Berechtigungen.</td></tr>}
+            {data.permissions.length === 0 && <tr><td colSpan={3} className="faint">{tr('Keine expliziten Berechtigungen.')}</td></tr>}
             {data.permissions.map((p, i) => (
               <tr key={`${p.principalType}${p.principalId}`}>
                 <td>
@@ -151,17 +152,17 @@ export function PermissionsModal({ space, onClose }) {
                     <Icon name={p.principalType === 'group' ? 'users' : 'user'} size={15} />
                     <strong>{p.name}</strong>
                     {p.username && <span className="faint mono tiny">@{p.username}</span>}
-                    {p.principalType === 'group' && <span className="badge">Gruppe</span>}
+                    {p.principalType === 'group' && <span className="badge">{tr('Gruppe')}</span>}
                   </div>
                 </td>
                 <td>
                   <select className="select sm" value={p.level} onChange={(e) => update(i, e.target.value)} style={{ width: 150 }}>
-                    <option value="read">Lesen</option>
-                    <option value="write">Schreiben</option>
-                    <option value="admin">Verwalten</option>
+                    <option value="read">{tr('Lesen')}</option>
+                    <option value="write">{tr('Schreiben')}</option>
+                    <option value="admin">{tr('Verwalten')}</option>
                   </select>
                 </td>
-                <td className="actions"><button className="btn ghost icon sm" onClick={() => remove(i)} aria-label="Entfernen"><Icon name="trash" size={14} /></button></td>
+                <td className="actions"><button className="btn ghost icon sm" onClick={() => remove(i)} aria-label={tr('Entfernen')}><Icon name="trash" size={14} /></button></td>
               </tr>
             ))}
           </tbody>
@@ -169,8 +170,8 @@ export function PermissionsModal({ space, onClose }) {
       </div>
 
       <div className="field">
-        <label>Person oder Gruppe hinzufügen</label>
-        <div className="input-icon"><Icon name="search" /><input className="input" placeholder="Name suchen …" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <label>{tr('Person oder Gruppe hinzufügen')}</label>
+        <div className="input-icon"><Icon name="search" /><input className="input" placeholder={tr('Name suchen …')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="row wrap" style={{ marginTop: 6 }}>
           {dir.groups.map((g) => (
             <button key={`g${g.id}`} className="btn sm" disabled={has('group', g.id)} onClick={() => add('group', g)}>

@@ -19,6 +19,8 @@ installierbar – inklusive Offline-Lesen zuletzt besuchter Seiten.
 | **Sysadmin-Extras** | Vorlagen für Runbooks, Incident-Postmortems, Server/Hosts, Changes, Services, Netzsegmente und Checklisten · strukturierte **Eigenschaften** („Spec Sheet“ mit Kopieren per Klick) · **Review-Termine** gegen veraltete Doku · abhakbare Checklisten direkt in der Leseansicht · Versionsverlauf mit Diff & Wiederherstellung · Anhänge · Export als Markdown/HTML · REST-API mit persönlichen **API-Tokens** · Audit-Log |
 | **Admin-Panel** | Separates „Control Center“ unter `/admin`: Systemübersicht, Benutzer, Gruppen, Bereiche & Rechte, Vorlagen, Tags, Branding & Theming, Audit-Log, Wartung & JSON-Export |
 | **Design & Theming** | Eigenständige Gestaltung aus dem Serverraum: RAL-Farben (Lichtgrau, Anthrazit, Signalblau, Signalgelb), Seitentypen als Beschriftungsband, Atkinson Hyperlegible und Overpass Mono. 6 Themes (Rack, Leitstand, Blueprint, VT220, Nord, Solarized), jeweils hell, dunkel oder nach System; Akzentfarbe, Schriftwahl, Admin-Standard-Theme und eigenes CSS über Design-Tokens. Kontraste nach WCAG AA geprüft |
+| **Import** | Übernahme aus Confluence (HTML-Export), Wiki.js (Export-Archiv oder GraphQL-API), BookStack (REST-API oder Portable ZIP), MediaWiki (XML-Export), DokuWiki (data-Ordner), Notion sowie Markdown/HTML-Archiven (Obsidian, MkDocs, GitHub-Wiki) – mit Vorschau, Hierarchie, Bildern, Anhängen, Tags und umgeschriebenen internen Links |
+| **Sprachen** | Oberfläche auf Deutsch und Englisch, umschaltbar pro Person (Einstellungen → Darstellung oder Login-Seite); Standardsprache im Admin-Panel bzw. per `DEFAULT_LANGUAGE`. Vorlagen gibt es in beiden Sprachen |
 | **PWA** | Installierbar, Service Worker mit App-Shell-Cache und Offline-Lesemodus |
 
 ## Schnellstart (Docker Compose)
@@ -58,6 +60,8 @@ docker run -d -p 8080:3000 \
 | `SESSION_DAYS` | `14` | Gültigkeit einer Anmeldung |
 | `MAX_UPLOAD_MB` | `25` | Maximale Größe pro Datei |
 | `SEED_DEMO_CONTENT` | `true` | Beispielinhalte beim ersten Start |
+| `DEFAULT_LANGUAGE` | `de` | Standardsprache (`de` oder `en`) für Oberfläche, Untertitel und Beispielinhalte |
+| `IMPORT_MAX_MB` | `1024` | Maximale Größe einer Import-Datei |
 
 Branding, Standard-Theme, Akzentfarbe, eigenes CSS, Ankündigungsbanner,
 Registrierung und Review-Intervall werden im Admin-Panel unter
@@ -73,6 +77,25 @@ wiki.example.com {
 
 Dann `COOKIE_SECURE=true` setzen. Für PWA-Installation und Service Worker ist HTTPS erforderlich
 (außer auf `localhost`).
+
+## Import aus anderen Wikis
+
+Unter **Administration → Import** wählst du die Quelle, lädst den Export hoch (oder gibst API-Zugangsdaten an)
+und bekommst zuerst eine Vorschau mit Seitenstruktur, Dateien und Hinweisen. Erst nach Bestätigung wird geschrieben.
+
+| Quelle | So exportieren | Was übernommen wird |
+| --- | --- | --- |
+| Confluence | Bereich → Bereichseinstellungen → Inhaltswerkzeuge → Exportieren → HTML | Hierarchie, Code-Makros, Info-/Warn-Panels, Aufgabenlisten, Expand, Tabellen, Anhänge mit Originalnamen |
+| Wiki.js | API-Schlüssel (Administration → API-Zugang) **oder** ZIP der Git-/Dateisystem-Speicherung | Pfade als Hierarchie, Tags, Datum, `{.is-info}`-Hinweise, Assets |
+| BookStack | API-Token (Profil → API-Tokens) **oder** Buch → Exportieren → Portable ZIP | Bücher, Kapitel, Seiten, Tags (mit Werten als Eigenschaften), Bilder, Anhänge, Callouts |
+| MediaWiki | Spezial:Exportieren bzw. `dumpBackup.php --current`, optional images-Ordner als ZIP | Wikitext → HTML, Unterseiten, Kategorien als Tags |
+| DokuWiki | ZIP des `data/`-Ordners | Namensräume, `start`-Seiten, Medien, `<note>`-Boxen, Code, Tabellen |
+| Notion | Exportieren → Markdown & CSV | Hierarchie und Bilder (Datenbanken werden übersprungen) |
+| Markdown/HTML | ZIP eines Obsidian-Vaults, MkDocs-Projekts, GitHub-Wikis … | Ordner-Hierarchie, Front Matter, `[[Wikilinks]]`, Callouts/Admonitions, Bilder |
+
+Ziel kann ein neuer Bereich, ein Bereich je Gruppe (Confluence-Bereich, BookStack-Buch …) oder ein bestehender
+Bereich sein. Gleichnamige Seiten werden wahlweise übersprungen, als neue Version gespeichert oder zusätzlich
+angelegt – damit lassen sich Importe auch wiederholen. API-Zugangsdaten werden nicht gespeichert.
 
 ## Berechtigungsmodell
 
@@ -146,12 +169,15 @@ server/                 Express-API (ESM)
   src/db/migrations/    SQL-Migrationen (laufen beim Start automatisch)
   src/db/seed.js        Admin, Vorlagen & Beispielinhalte
   src/lib/              Auth, Berechtigungen, HTML-Sanitizing, Einstellungen, Audit
-  src/routes/           auth, spaces, pages, search, tags, attachments, templates, admin
+  src/routes/           auth, spaces, pages, search, tags, attachments, templates, admin, imports
+  src/importers/        Confluence, Wiki.js, BookStack, MediaWiki, DokuWiki, Markdown/Notion + Writer
 client/                 React-SPA (Vite)
   public/sw.js          Service Worker (PWA)
   src/components/       Layout, Seitenbaum, Befehlspalette, Editor (TipTap) …
   src/pages/            Wiki-Ansichten
-  src/pages/admin/      Admin-Panel
+  src/pages/admin/      Admin-Panel (inkl. Import)
+  src/lib/i18n.js       Übersetzungen: deutsche Texte sind die Schlüssel,
+  src/locales/en.js     englisches Wörterbuch
   src/styles/           Themes (Design-Tokens), Layout, Inhalte
 ```
 

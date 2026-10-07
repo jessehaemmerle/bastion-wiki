@@ -1,3 +1,5 @@
+import { tr, trServer } from './i18n.js';
+
 export class ApiError extends Error {
   constructor(status, message, data) {
     super(message);
@@ -17,12 +19,12 @@ async function request(method, url, body, opts = {}) {
   try {
     res = await fetch(`/api${url}`, init);
   } catch {
-    throw new ApiError(0, 'Keine Verbindung zum Server – bist du offline?');
+    throw new ApiError(0, tr('Keine Verbindung zum Server – bist du offline?'));
   }
   if (opts.raw) return res;
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok) {
-    const err = new ApiError(res.status, data?.error || `Fehler ${res.status}`, data);
+    const err = new ApiError(res.status, data?.error ? trServer(data.error) : tr('Fehler {n}', { n: res.status }), data);
     if (res.status === 401 && !url.startsWith('/auth/')) window.dispatchEvent(new CustomEvent('bastion:unauthorized'));
     throw err;
   }

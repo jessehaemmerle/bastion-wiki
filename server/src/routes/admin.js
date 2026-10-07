@@ -253,6 +253,7 @@ router.put('/admin/settings', async (req, res) => {
     tagline: { type: 'string', max: 160 },
     defaultTheme: { type: 'string', max: 40 },
     defaultMode: { type: 'string', enum: ['light', 'dark', 'system'] },
+    defaultLanguage: { type: 'string', enum: ['de', 'en'] },
     accentColor: { type: 'string', pattern: /^(#[0-9a-fA-F]{6})?$/ },
     allowRegistration: { type: 'bool' },
     defaultRole: { type: 'string', enum: ['editor', 'viewer'] },

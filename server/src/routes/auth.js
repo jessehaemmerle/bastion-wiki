@@ -101,6 +101,7 @@ function sanitizePrefs(p) {
   const out = {};
   if (typeof p.theme === 'string' && p.theme.length < 40) out.theme = p.theme;
   if (['light', 'dark', 'system'].includes(p.mode)) out.mode = p.mode;
+  if (['de', 'en'].includes(p.language)) out.language = p.language;
   if (typeof p.accent === 'string' && /^(#[0-9a-f]{6})?$/i.test(p.accent)) out.accent = p.accent;
   if (['compact', 'comfortable'].includes(p.density)) out.density = p.density;
   if (typeof p.sidebarCollapsed === 'boolean') out.sidebarCollapsed = p.sidebarCollapsed;

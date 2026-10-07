@@ -9,6 +9,7 @@ import { useApp } from '../lib/context.jsx';
 import { useChrome, useFetch } from '../lib/hooks.js';
 import { formatBytes, formatDate, PAGE_TYPES, timeAgo } from '../lib/format.js';
 import { buildTree } from '../components/PageTree.jsx';
+import { tr } from '../lib/i18n.js';
 
 function PropValue({ value }) {
   if (/^https?:\/\/\S+$/.test(value)) return <a href={value} target="_blank" rel="noopener noreferrer">{value}</a>;
@@ -32,7 +33,7 @@ function Toc({ headings }) {
   if (!headings.length) return null;
   return (
     <div>
-      <h4>Inhalt</h4>
+      <h4>{tr('Inhalt')}</h4>
       <ul className="toc">
         {headings.map((h) => (
           <li key={h.id} className={`l${h.level}`}>
@@ -70,27 +71,27 @@ function MoveModal({ page, onClose, onMoved }) {
   const move = async () => {
     try {
       await api.post(`/pages/${page.id}/move`, { spaceId: tree.space.id, parentId: parentId ? Number(parentId) : null });
-      toast('Seite verschoben');
+      toast(tr('Seite verschoben'));
       onMoved();
       onClose();
     } catch (e) { toast(e.message, 'error'); }
   };
   return (
-    <Modal title="Seite verschieben" icon="move" onClose={onClose}
-      footer={<><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={!tree} onClick={move}>Verschieben</button></>}>
+    <Modal title={tr('Seite verschieben')} icon="move" onClose={onClose}
+      footer={<><button className="btn" onClick={onClose}>{tr('Abbrechen')}</button><button className="btn primary" disabled={!tree} onClick={move}>{tr('Verschieben')}</button></>}>
       <div className="field">
-        <label>Bereich</label>
+        <label>{tr('Bereich')}</label>
         <select className="select" value={spaceKey} onChange={(e) => { setSpaceKey(e.target.value); setParentId(''); }}>
           {writable.map((s) => <option key={s.id} value={s.key}>{s.name}</option>)}
         </select>
       </div>
       <div className="field">
-        <label>Übergeordnete Seite</label>
+        <label>{tr('Übergeordnete Seite')}</label>
         <select className="select" value={parentId} onChange={(e) => setParentId(e.target.value)}>
-          <option value="">— Oberste Ebene —</option>
+          <option value="">{tr('— Oberste Ebene —')}</option>
           {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
-        <span className="hint">Unterseiten werden mit verschoben.</span>
+        <span className="hint">{tr('Unterseiten werden mit verschoben.')}</span>
       </div>
     </Modal>
   );
@@ -146,7 +147,7 @@ export default function PageView() {
     li.setAttribute('data-checked', String(checked));
     const content = doc.body.innerHTML;
     try {
-      const res = await api.put(`/pages/${page.id}`, { content, baseVersion: page.version, summary: 'Checkliste aktualisiert' });
+      const res = await api.put(`/pages/${page.id}`, { content, baseVersion: page.version, summary: tr('Checkliste aktualisiert') });
       setData((d) => ({ page: { ...d.page, content, version: res.page.version, updatedAt: res.page.updatedAt } }));
     } catch (e) {
       toast(e.message, 'error');
@@ -173,25 +174,25 @@ export default function PageView() {
   const togglePin = () => act(async () => {
     await api.put(`/pages/${page.id}`, { isPinned: !page.isPinned });
     setData((d) => ({ page: { ...d.page, isPinned: !d.page.isPinned } }));
-  }, page.isPinned ? 'Nicht mehr angepinnt' : 'Seite angepinnt');
+  }, page.isPinned ? tr('Nicht mehr angepinnt') : tr('Seite angepinnt'));
   const markReviewed = () => act(async () => {
     const { reviewDue } = await api.post(`/pages/${page.id}/reviewed`, { days: settings.reviewIntervalDays || 180 });
     setData((d) => ({ page: { ...d.page, reviewDue } }));
     refreshTree();
-  }, 'Als geprüft markiert');
+  }, tr('Als geprüft markiert'));
   const duplicate = () => act(async () => {
     const res = await api.post(`/pages/${page.id}/duplicate`);
     refreshTree();
     navigate(`/p/${res.page.id}/edit`);
-  }, 'Kopie erstellt');
+  }, tr('Kopie erstellt'));
   const upload = async (files) => act(async () => {
     await api.upload(`/pages/${page.id}/attachments`, files);
     reload();
-  }, 'Datei hochgeladen');
+  }, tr('Datei hochgeladen'));
   const deleteAttachment = (a) => act(async () => {
     await api.del(`/attachments/${a.id}`);
     setData((d) => ({ page: { ...d.page, attachments: d.page.attachments.filter((x) => x.id !== a.id) } }));
-  }, 'Datei gelöscht');
+  }, tr('Datei gelöscht'));
 
   return (
     <div className="content">
@@ -203,23 +204,23 @@ export default function PageView() {
               <Link to={`/s/${page.space.key}`} className="row" style={{ gap: 6 }}><span className="cable" style={{ '--sc': page.space.color }} />{page.space.name}</Link>
             </div>
             <div className="page-toolbar">
-              {canWrite && <Link to={`/p/${page.id}/edit`} className="btn primary sm" title="Bearbeiten (E)"><Icon name="pen" size={14} /> Bearbeiten</Link>}
-              <button className={`btn sm icon ${page.isFavorite ? 'active' : ''}`} onClick={toggleFavorite} title={page.isFavorite ? 'Favorit entfernen' : 'Als Favorit markieren'}>
+              {canWrite && <Link to={`/p/${page.id}/edit`} className="btn primary sm" title={tr('Bearbeiten (E)')}><Icon name="pen" size={14} /> {tr('Bearbeiten')}</Link>}
+              <button className={`btn sm icon ${page.isFavorite ? 'active' : ''}`} onClick={toggleFavorite} title={page.isFavorite ? tr('Favorit entfernen') : tr('Als Favorit markieren')}>
                 <Icon name="star" size={15} fill={page.isFavorite ? 'currentColor' : 'none'} />
               </button>
-              <Dropdown trigger={({ toggle }) => <button className="btn sm icon" onClick={toggle} aria-label="Weitere Aktionen"><Icon name="more" size={15} /></button>}>
-                <MenuItem icon="history" to={`/p/${page.id}/history`}>Versionsverlauf</MenuItem>
-                <MenuItem icon="link" onClick={() => { copy(`${location.origin}/p/${page.id}`); toast('Link kopiert'); }}>Link kopieren</MenuItem>
-                {canWrite && <MenuItem icon={page.isPinned ? 'pin-off' : 'pin'} onClick={togglePin}>{page.isPinned ? 'Nicht mehr anpinnen' : 'Anpinnen'}</MenuItem>}
-                {canWrite && <MenuItem icon="plus" to={`/new?space=${page.space.key}&parent=${page.id}`}>Unterseite anlegen</MenuItem>}
-                {canWrite && <MenuItem icon="copy" onClick={duplicate}>Duplizieren</MenuItem>}
-                {canWrite && <MenuItem icon="move" onClick={() => setModal('move')}>Verschieben</MenuItem>}
-                {canWrite && <MenuItem icon="paperclip" onClick={() => uploadRef.current?.click()}>Datei anhängen</MenuItem>}
+              <Dropdown trigger={({ toggle }) => <button className="btn sm icon" onClick={toggle} aria-label={tr('Weitere Aktionen')}><Icon name="more" size={15} /></button>}>
+                <MenuItem icon="history" to={`/p/${page.id}/history`}>{tr('Versionsverlauf')}</MenuItem>
+                <MenuItem icon="link" onClick={() => { copy(`${location.origin}/p/${page.id}`); toast(tr('Link kopiert')); }}>{tr('Link kopieren')}</MenuItem>
+                {canWrite && <MenuItem icon={page.isPinned ? 'pin-off' : 'pin'} onClick={togglePin}>{page.isPinned ? tr('Nicht mehr anpinnen') : tr('Anpinnen')}</MenuItem>}
+                {canWrite && <MenuItem icon="plus" to={`/new?space=${page.space.key}&parent=${page.id}`}>{tr('Unterseite anlegen')}</MenuItem>}
+                {canWrite && <MenuItem icon="copy" onClick={duplicate}>{tr('Duplizieren')}</MenuItem>}
+                {canWrite && <MenuItem icon="move" onClick={() => setModal('move')}>{tr('Verschieben')}</MenuItem>}
+                {canWrite && <MenuItem icon="paperclip" onClick={() => uploadRef.current?.click()}>{tr('Datei anhängen')}</MenuItem>}
                 <div className="menu-sep" />
-                <MenuItem icon="download" href={`/api/pages/${page.id}/export?format=md`}>Als Markdown exportieren</MenuItem>
-                <MenuItem icon="file-code" href={`/api/pages/${page.id}/export?format=html`}>Als HTML exportieren</MenuItem>
-                <MenuItem icon="printer" onClick={() => window.print()}>Drucken / PDF</MenuItem>
-                {canWrite && <><div className="menu-sep" /><MenuItem icon="trash" danger onClick={() => setModal('delete')}>Löschen</MenuItem></>}
+                <MenuItem icon="download" href={`/api/pages/${page.id}/export?format=md`}>{tr('Als Markdown exportieren')}</MenuItem>
+                <MenuItem icon="file-code" href={`/api/pages/${page.id}/export?format=html`}>{tr('Als HTML exportieren')}</MenuItem>
+                <MenuItem icon="printer" onClick={() => window.print()}>{tr('Drucken / PDF')}</MenuItem>
+                {canWrite && <><div className="menu-sep" /><MenuItem icon="trash" danger onClick={() => setModal('delete')}>{tr('Löschen')}</MenuItem></>}
               </Dropdown>
             </div>
           </div>
@@ -229,11 +230,11 @@ export default function PageView() {
             <span>{page.title}</span>
           </h1>
           <div className="page-meta-line">
-            <span title={formatDate(page.updatedAt, true)}>Geändert {timeAgo(page.updatedAt)}{page.updatedBy ? ` von ${page.updatedBy}` : ''}</span>
-            <Link to={`/p/${page.id}/history`}>Version <span className="mono">{page.version}</span></Link>
-            <span>{readMin} Min. Lesezeit</span>
-            {page.isPinned && <span><Icon name="pin" size={13} /> Angepinnt</span>}
-            {page.reviewDue && !overdue && <span>Nächstes Review {formatDate(page.reviewDue)}</span>}
+            <span title={formatDate(page.updatedAt, true)}>{page.updatedBy ? tr('Geändert {when} von {who}', { when: timeAgo(page.updatedAt), who: page.updatedBy }) : tr('Geändert {when}', { when: timeAgo(page.updatedAt) })}</span>
+            <Link to={`/p/${page.id}/history`}>{tr('Version')} <span className="mono">{page.version}</span></Link>
+            <span>{tr('{n} Min. Lesezeit', { n: readMin })}</span>
+            {page.isPinned && <span><Icon name="pin" size={13} /> {tr('Angepinnt')}</span>}
+            {page.reviewDue && !overdue && <span>{tr('Nächstes Review {date}', { date: formatDate(page.reviewDue) })}</span>}
           </div>
           {page.tags.length > 0 && <div className="page-tags">{page.tags.map((t) => <TagPill key={t.name} name={t.name} color={t.color} />)}</div>}
 
@@ -241,16 +242,16 @@ export default function PageView() {
             <div className="review-banner">
               <Icon name="calendar-clock" size={18} />
               <div className="grow">
-                <strong>Review seit {formatDate(page.reviewDue)} überfällig.</strong> Prüfe, ob der Inhalt noch stimmt, und bestätige es.
+                <strong>{tr('Review seit {date} überfällig.', { date: formatDate(page.reviewDue) })}</strong> {tr('Prüfe, ob der Inhalt noch stimmt, und bestätige es.')}
               </div>
-              {canWrite && <button className="btn sm" onClick={markReviewed}><Icon name="check" size={14} /> Als geprüft markieren</button>}
+              {canWrite && <button className="btn sm" onClick={markReviewed}><Icon name="check" size={14} /> {tr('Als geprüft markieren')}</button>}
             </div>
           )}
 
           {props.length > 0 && (
-            <section className="spec" aria-label="Eigenschaften">
+            <section className="spec" aria-label={tr('Eigenschaften')}>
               <div className="spec-head">
-                <span>Datenblatt</span>
+                <span>{tr('Datenblatt')}</span>
               </div>
               <div className="spec-grid">
                 {props.map(([k, v]) => (
@@ -259,7 +260,7 @@ export default function PageView() {
                     <div className="v">
                       <PropValue value={v} />
                       {v && (
-                        <button onClick={() => copy(v, k)} title="Kopieren" aria-label={`${k} kopieren`}>
+                        <button onClick={() => copy(v, k)} title={tr('Kopieren')} aria-label={`${k} kopieren`}>
                           <Icon name={copied === k ? 'check' : 'copy'} size={13} />
                         </button>
                       )}
@@ -272,12 +273,12 @@ export default function PageView() {
 
           <ContentView html={page.content} onHeadings={onHeadings} onToggleTask={canWrite ? toggleTask : undefined} />
           {!page.content?.replace(/<[^>]+>/g, '').trim() && !page.content?.includes('<img') && (
-            <div className="faint" style={{ padding: '20px 0' }}>Diese Seite hat noch keinen Inhalt. {canWrite && <Link to={`/p/${page.id}/edit`}>Seite bearbeiten</Link>}</div>
+            <div className="faint" style={{ padding: '20px 0' }}>{tr('Diese Seite hat noch keinen Inhalt.')} {canWrite && <Link to={`/p/${page.id}/edit`}>{tr('Seite bearbeiten')}</Link>}</div>
           )}
 
           {page.children.length > 0 && (
             <>
-              <div className="section-title"><h3>Unterseiten</h3></div>
+              <div className="section-title"><h3>{tr('Unterseiten')}</h3></div>
               <div className="children-grid">
                 {page.children.map((c) => (
                   <Link key={c.id} to={`/p/${c.id}`} className="child-card">
@@ -291,8 +292,8 @@ export default function PageView() {
           {(page.attachments.length > 0 || canWrite) && (
             <>
               <div className="section-title">
-                <h3>Anhänge</h3>
-                {canWrite && <button className="btn sm ghost" onClick={() => uploadRef.current?.click()}><Icon name="upload" size={14} /> Hochladen</button>}
+                <h3>{tr('Anhänge')}</h3>
+                {canWrite && <button className="btn sm ghost" onClick={() => uploadRef.current?.click()}><Icon name="upload" size={14} /> {tr('Hochladen')}</button>}
               </div>
               <div className="attachments">
                 {page.attachments.map((a) => (
@@ -301,11 +302,11 @@ export default function PageView() {
                     <a href={`/api/attachments/${a.id}`} target="_blank" rel="noreferrer" className="grow ellipsis">{a.filename}</a>
                     <span className="faint tiny mono">{formatBytes(a.size)}</span>
                     <span className="faint tiny desktop-only">{a.uploadedBy}, {timeAgo(a.createdAt)}</span>
-                    <a className="btn ghost icon sm" href={`/api/attachments/${a.id}?download`} aria-label="Herunterladen"><Icon name="download" size={14} /></a>
-                    {canWrite && <button className="btn ghost icon sm" onClick={() => deleteAttachment(a)} aria-label="Löschen"><Icon name="trash" size={14} /></button>}
+                    <a className="btn ghost icon sm" href={`/api/attachments/${a.id}?download`} aria-label={tr('Herunterladen')}><Icon name="download" size={14} /></a>
+                    {canWrite && <button className="btn ghost icon sm" onClick={() => deleteAttachment(a)} aria-label={tr('Löschen')}><Icon name="trash" size={14} /></button>}
                   </div>
                 ))}
-                {!page.attachments.length && <div className="faint small">Keine Dateien angehängt.</div>}
+                {!page.attachments.length && <div className="faint small">{tr('Keine Dateien angehängt.')}</div>}
               </div>
             </>
           )}
@@ -315,12 +316,12 @@ export default function PageView() {
         <aside className="aside toc-aside">
           <Toc headings={headings} />
           <div>
-            <h4>Über diese Seite</h4>
+            <h4>{tr('Über diese Seite')}</h4>
             <dl className="facts">
-              <dt>Erstellt</dt><dd>{formatDate(page.createdAt)}</dd>
-              <dt>von</dt><dd>{page.createdBy || 'unbekannt'}</dd>
-              <dt>Wörter</dt><dd>{page.wordCount}</dd>
-              <dt>Seiten-ID</dt><dd className="mono">{page.id}</dd>
+              <dt>{tr('Erstellt')}</dt><dd>{formatDate(page.createdAt)}</dd>
+              <dt>{tr('von')}</dt><dd>{page.createdBy || tr('unbekannt')}</dd>
+              <dt>{tr('Wörter')}</dt><dd>{page.wordCount}</dd>
+              <dt>{tr('Seiten-ID')}</dt><dd className="mono">{page.id}</dd>
             </dl>
           </div>
         </aside>
@@ -330,15 +331,15 @@ export default function PageView() {
       {modal === 'delete' && (
         <Confirm
           danger
-          title="Seite löschen?"
-          message={<>„{page.title}“ wird mit allen Versionen und Anhängen gelöscht. {page.children.length > 0 && 'Unterseiten werden eine Ebene nach oben verschoben.'}</>}
-          confirmLabel="Löschen"
+          title={tr('Seite löschen?')}
+          message={<>{tr('„{title}“ wird mit allen Versionen und Anhängen gelöscht.', { title: page.title })} {page.children.length > 0 && tr('Unterseiten werden eine Ebene nach oben verschoben.')}</>}
+          confirmLabel={tr('Löschen')}
           onClose={() => setModal(null)}
           onConfirm={() => act(async () => {
             await api.del(`/pages/${page.id}`);
             refreshTree();
             navigate(page.parentId ? `/p/${page.parentId}` : `/s/${page.space.key}`);
-          }, 'Seite gelöscht')}
+          }, tr('Seite gelöscht'))}
         />
       )}
     </div>

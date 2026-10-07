@@ -37,6 +37,8 @@ services:
       SESSION_DAYS: ${SESSION_DAYS:-14}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
       SEED_DEMO_CONTENT: ${SEED_DEMO_CONTENT:-true}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-de}
+      IMPORT_MAX_MB: ${IMPORT_MAX_MB:-1024}
     volumes:
       - uploads:/data
 

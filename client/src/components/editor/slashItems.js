@@ -1,3 +1,4 @@
+import { tr } from '../../lib/i18n.js';
 /** Block types offered by the "/" menu */
 export const SLASH_ITEMS = [
   { title: 'Text', desc: 'Normaler Absatz', icon: 'type', keywords: 'paragraph absatz', run: (e) => e.chain().focus().setParagraph().run() },
@@ -21,5 +22,5 @@ export const SLASH_ITEMS = [
 
 export function filterSlashItems(query) {
   const q = query.toLowerCase();
-  return SLASH_ITEMS.filter((i) => !q || i.title.toLowerCase().includes(q) || i.keywords.includes(q)).slice(0, 12);
+  return SLASH_ITEMS.filter((i) => !q || i.title.toLowerCase().includes(q) || tr(i.title).toLowerCase().includes(q) || i.keywords.includes(q)).slice(0, 12);
 }
