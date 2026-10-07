@@ -3,28 +3,28 @@ import { PageIcon } from './Icon.jsx';
 import { PAGE_TYPES, timeAgo, formatDate } from '../lib/format.js';
 
 export default function PageList({ pages, showSpace = true, showReview = false, empty = 'Keine Seiten.' }) {
-  if (!pages?.length) return <div className="faint small" style={{ padding: '14px 18px' }}>{empty}</div>;
+  if (!pages?.length) return <p className="muted small" style={{ margin: '8px 0' }}>{empty}</p>;
   const today = new Date().toISOString().slice(0, 10);
   return (
     <ul className="list">
       {pages.map((p) => (
         <li key={p.id}>
-          <Link to={`/p/${p.id}`} className="list-item" style={{ '--sc': p.spaceColor }}>
+          <Link to={`/p/${p.id}`} className="list-item">
             <span className="li-icon"><PageIcon icon={p.icon} fallback={PAGE_TYPES[p.pageType]?.icon} /></span>
             <div className="grow">
               <div className="li-title">{p.title}</div>
               <div className="li-meta">
-                {showSpace && <span>{p.spaceName}</span>}
+                {showSpace && <span className="row" style={{ gap: 5 }}><span className="cable" style={{ '--sc': p.spaceColor }} />{p.spaceName}</span>}
                 {showReview && p.reviewDue ? (
-                  <span style={{ color: p.reviewDue < today ? 'var(--danger)' : 'var(--warning)' }}>
-                    Review {p.reviewDue < today ? 'überfällig seit' : 'fällig am'} {formatDate(p.reviewDue)}
+                  <span style={{ color: p.reviewDue < today ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 700 }}>
+                    {p.reviewDue < today ? 'Überfällig seit' : 'Fällig am'} {formatDate(p.reviewDue)}
                   </span>
                 ) : (
-                  <span>{timeAgo(p.updatedAt)}{p.updatedBy ? ` · ${p.updatedBy}` : ''}</span>
+                  <span>{timeAgo(p.updatedAt)}</span>
                 )}
               </div>
             </div>
-            {p.pageType !== 'doc' && <span className="badge mono desktop-only">{PAGE_TYPES[p.pageType]?.label}</span>}
+            {p.pageType !== 'doc' && <span className="tape desktop-only">{PAGE_TYPES[p.pageType]?.label}</span>}
           </Link>
         </li>
       ))}

@@ -9,9 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.3.0",
-    "@fontsource-variable/jetbrains-mono": "^5.3.0",
-    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource/overpass-mono": "^5.3.0",
     "@tiptap/extension-code-block-lowlight": "^3.31.4",
     "@tiptap/extension-highlight": "^3.31.4",
     "@tiptap/extension-image": "^3.31.4",

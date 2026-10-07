@@ -20,7 +20,6 @@ export default function Tags() {
     <div className="content narrow">
       <div className="page-head">
         <div>
-          <span className="eyebrow">Taxonomie</span>
           <h1>Tags</h1>
           <p>{data?.tags.length} Tags über alle Bereiche, die du sehen darfst.</p>
         </div>
@@ -54,7 +53,6 @@ export function TagDetail() {
     <div className="content narrow">
       <div className="page-head">
         <div>
-          <span className="eyebrow">Tag</span>
           <h1 className="mono">#{name}</h1>
           <p>{pages.data?.pages.length ?? '…'} Seiten</p>
         </div>

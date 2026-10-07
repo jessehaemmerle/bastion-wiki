@@ -61,3 +61,14 @@ export const PAGE_TYPES = {
 
 export const ROLE_LABELS = { admin: 'Administrator', editor: 'Redakteur', viewer: 'Betrachter' };
 export const ACCESS_LABELS = { none: 'Kein Zugriff', read: 'Lesen', write: 'Schreiben', admin: 'Verwalten' };
+
+/** Compact timestamp for log columns: "14:32" today, "gestern", otherwise "12.09." */
+export function shortWhen(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const y = new Date(now.getTime() - 864e5);
+  if (d.toDateString() === y.toDateString()) return 'gestern';
+  return d.toLocaleDateString('de-DE', d.getFullYear() === now.getFullYear() ? { day: '2-digit', month: '2-digit' } : { day: '2-digit', month: '2-digit', year: '2-digit' });
+}

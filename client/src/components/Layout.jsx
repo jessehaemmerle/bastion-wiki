@@ -8,29 +8,31 @@ import { api } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
 import { ROLE_LABELS } from '../lib/format.js';
 
-export function Logo({ size = 22 }) {
+/** Logo: a rack front with one labelled unit */
+export function Logo({ size = 26, className = 'logo' }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 2.5 4.5 5.5v6c0 4.6 3.1 8.3 7.5 10 4.4-1.7 7.5-5.4 7.5-10v-6z" fill="currentColor" fillOpacity=".18" />
-      <path d="m9 10 2.5 2.5L9 15" />
-      <path d="M13.5 15H16" />
+    <svg viewBox="0 0 32 32" width={size} height={size} className={className} aria-hidden="true">
+      <rect width="32" height="32" rx="4.5" fill="#2b3135" />
+      <rect x="6" y="7" width="20" height="4" rx=".4" fill="#5c666b" />
+      <rect x="6" y="14" width="20" height="4" rx=".4" fill="#f2c200" />
+      <rect x="8" y="15.4" width="6" height="1.2" fill="#1d1d1b" />
+      <rect x="6" y="21" width="20" height="4" rx=".4" fill="#5c666b" />
     </svg>
   );
 }
 
 export default function Layout() {
-  const app = useApp();
-  const { user, spaces, settings, treeVersion, setPaletteOpen, themeState, updatePreferences, logout, online } = app;
+  const { user, spaces, settings, treeVersion, setPaletteOpen, updatePreferences, logout, online } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const [crumbs, setCrumbs] = useState([]);
-  const [currentSpace, setCurrentSpace] = useState(null); // key
+  const [currentSpace, setCurrentSpace] = useState(null);
   const [activePageId, setActivePageId] = useState(null);
   const [tree, setTree] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
   const collapsed = Boolean(user?.preferences?.sidebarCollapsed);
+  const isDark = document.documentElement.dataset.mode === 'dark';
 
-  // keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -40,7 +42,7 @@ export default function Layout() {
       } else if (mod && e.key === '\\') {
         e.preventDefault();
         updatePreferences({ sidebarCollapsed: !collapsed });
-      } else if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) {
+      } else if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) {
         e.preventDefault();
         setPaletteOpen(true);
       }
@@ -66,152 +68,96 @@ export default function Layout() {
 
   const space = tree?.space;
   const canWriteSpace = space && ['write', 'admin'].includes(space.access);
-  const toggleMode = () => {
-    const effective = document.documentElement.dataset.mode;
-    updatePreferences({ mode: effective === 'dark' ? 'light' : 'dark' });
-  };
 
   return (
     <div className={`shell ${collapsed ? 'sidebar-collapsed' : ''} ${mobileNav ? 'mobile-nav-open' : ''}`}>
-      <div className="backdrop" />
-
-      {/* ---------- rail ---------- */}
-      <nav className="rail" aria-label="Bereiche">
-        <Link to="/" className="rail-logo" title={settings.siteName}><Logo /></Link>
-        <NavLink to="/" end className="rail-btn"><Icon name="dashboard" size={19} /><span className="tip">Dashboard</span></NavLink>
-        <NavLink to="/search" className="rail-btn"><Icon name="search" size={19} /><span className="tip">Suche</span></NavLink>
-        <NavLink to="/tags" className="rail-btn"><Icon name="tags" size={19} /><span className="tip">Tags</span></NavLink>
-        <div className="rail-sep" />
-        <div className="rail-scroll">
-          {spaces.map((s) => (
-            <Link
-              key={s.id}
-              to={`/s/${s.key}`}
-              className={`rail-btn rail-space ${currentSpace === s.key ? 'active' : ''}`}
-              style={{ '--sc': s.color }}
-            >
-              <Icon name={s.icon} size={18} />
-              <span className="tip">{s.name}</span>
-            </Link>
-          ))}
-          {user.role !== 'viewer' && (
-            <Link to="/spaces?new=1" className="rail-btn" title="Neuer Bereich"><Icon name="plus" size={18} /><span className="tip">Neuer Bereich</span></Link>
-          )}
-        </div>
-        <div className="rail-sep" />
-        <button className="rail-btn" onClick={toggleMode} aria-label="Hell/Dunkel umschalten">
-          <Icon name={document.documentElement.dataset.mode === 'dark' ? 'sun' : 'moon'} size={19} />
-          <span className="tip">{themeState.mode === 'system' ? 'System' : 'Modus wechseln'}</span>
-        </button>
-        {user.role === 'admin' && (
-          <Link to="/admin" className="rail-btn"><Icon name="shield-check" size={19} /><span className="tip">Admin-Panel</span></Link>
-        )}
-        <Dropdown
-          up
-          align="left"
-          trigger={({ toggle }) => (
-            <button className="rail-btn" onClick={toggle} aria-label="Konto"><Avatar name={user.displayName} size={32} /></button>
-          )}
-        >
-          <div className="menu-label">
-            <div style={{ fontWeight: 600 }}>{user.displayName}</div>
-            <div className="tiny faint mono">@{user.username} · {ROLE_LABELS[user.role]}</div>
-          </div>
-          <div className="menu-sep" />
-          <MenuItem icon="user-cog" to="/settings">Einstellungen</MenuItem>
-          <MenuItem icon="palette" to="/settings/appearance">Darstellung</MenuItem>
-          <MenuItem icon="key-round" to="/settings/tokens">API-Tokens</MenuItem>
-          {user.role === 'admin' && <MenuItem icon="shield-check" to="/admin">Admin-Panel</MenuItem>}
-          <div className="menu-sep" />
-          <MenuItem icon="log-out" onClick={async () => { await logout(); navigate('/login'); }}>Abmelden</MenuItem>
-        </Dropdown>
-      </nav>
-
-      {/* ---------- sidebar ---------- */}
       <aside className="sidebar" aria-label="Navigation">
         <div className="sidebar-head">
-          {space ? (
-            <Link to={`/s/${space.key}`} className="sidebar-title" style={{ color: 'inherit', textDecoration: 'none' }}>
-              <span className="space-chip" style={{ '--sc': space.color }}><Icon name={space.icon} size={16} /></span>
-              <div className="grow">
-                <h2 className="ellipsis">{space.name}</h2>
-                <div className="tiny faint mono">{space.key} · {tree.pages.length} Seiten</div>
-              </div>
-            </Link>
-          ) : (
-            <Link to="/" className="sidebar-title" style={{ color: 'inherit', textDecoration: 'none' }}>
-              <span className="space-chip" style={{ '--sc': 'var(--accent)' }}><Logo size={17} /></span>
-              <div className="grow">
-                <h2 className="ellipsis">{settings.siteName || 'Bastion'}</h2>
-                <div className="tiny faint">{settings.tagline}</div>
-              </div>
-            </Link>
-          )}
+          <Link to="/" className="brand"><Logo /> <span className="ellipsis">{settings.siteName || 'Bastion'}</span></Link>
           <button className="sidebar-search" onClick={() => setPaletteOpen(true)}>
-            <Icon name="search" size={15} /> Suchen … <span className="kbd">Strg K</span>
+            <Icon name="search" size={15} /> Suchen <span className="kbd">Strg K</span>
           </button>
         </div>
-        <div className="sidebar-body">
-          {space ? (
-            <div className="sidebar-section">
-              <div className="sidebar-section-head">
-                <span className="eyebrow" style={{ padding: '0 10px 6px' }}>Seiten</span>
-                {canWriteSpace && (
-                  <Link to={`/new?space=${space.key}`} className="btn ghost icon sm" title="Neue Seite"><Icon name="plus" size={15} /></Link>
-                )}
-              </div>
-              <PageTree spaceKey={space.key} pages={tree.pages} canWrite={canWriteSpace} activeId={activePageId} />
+        <nav className="sidebar-body">
+          <NavLink to="/" end className="nav-item"><Icon name="home" size={16} /> Start</NavLink>
+          <NavLink to="/review" className="nav-item"><Icon name="calendar-clock" size={16} /> Zu prüfen</NavLink>
+          <NavLink to="/tags" className="nav-item"><Icon name="tags" size={16} /> Tags</NavLink>
+
+          <div className="sidebar-section">
+            <div className="sidebar-section-head">
+              <Link to="/spaces" style={{ color: 'inherit', textDecoration: 'none' }}>Bereiche</Link>
+              {user.role !== 'viewer' && (
+                <Link to="/spaces?new=1" className="btn ghost icon sm" title="Bereich anlegen" aria-label="Bereich anlegen"><Icon name="plus" size={14} /></Link>
+              )}
             </div>
-          ) : (
-            <>
-              <div className="sidebar-section">
-                <NavLink to="/" end className="nav-item"><Icon name="dashboard" size={16} /> Dashboard</NavLink>
-                <NavLink to="/spaces" className="nav-item"><Icon name="grid" size={16} /> Alle Bereiche</NavLink>
-                <NavLink to="/search" className="nav-item"><Icon name="search" size={16} /> Erweiterte Suche</NavLink>
-                <NavLink to="/tags" className="nav-item"><Icon name="tags" size={16} /> Tags</NavLink>
-                <NavLink to="/review" className="nav-item"><Icon name="calendar-clock" size={16} /> Review fällig</NavLink>
-              </div>
-              <div className="sidebar-section">
-                <span className="eyebrow">Bereiche</span>
-                {spaces.map((s) => (
-                  <Link key={s.id} to={`/s/${s.key}`} className="nav-item">
-                    <Icon name={s.icon} size={16} style={{ color: s.color }} /> <span className="ellipsis">{s.name}</span>
+            {spaces.map((s) => {
+              const open = currentSpace === s.key;
+              return (
+                <div key={s.id}>
+                  <Link to={`/s/${s.key}`} className={`nav-item space-row ${open && location.pathname === `/s/${s.key}` ? 'active' : ''}`} style={{ '--sc': s.color }}>
+                    <span className="ellipsis" style={{ fontWeight: open ? 700 : 400 }}>{s.name}</span>
                     <span className="count">{s.pageCount}</span>
                   </Link>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+                  {open && tree && (
+                    <div className="space-tree">
+                      <PageTree spaceKey={s.key} pages={tree.pages} canWrite={canWriteSpace} activeId={activePageId} />
+                      {canWriteSpace && (
+                        <Link to={`/new?space=${s.key}`} className="nav-item small" style={{ color: 'var(--text-muted)' }}>
+                          <Icon name="plus" size={14} /> Seite anlegen
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </nav>
         <div className="sidebar-foot">
-          {space && <Link to="/" className="btn ghost sm"><Icon name="arrow-left" size={14} /> Übersicht</Link>}
-          <div className="grow" />
-          {space && space.access === 'admin' && (
-            <Link to={`/s/${space.key}?settings=1`} className="btn ghost icon sm" title="Bereich verwalten"><Icon name="settings" size={15} /></Link>
-          )}
-          <button className="btn ghost icon sm desktop-only" title="Seitenleiste einklappen (Strg+\)" onClick={() => updatePreferences({ sidebarCollapsed: true })}>
+          <Dropdown
+            up
+            align="left"
+            className="grow"
+            trigger={({ toggle }) => (
+              <button className="who" onClick={toggle} aria-label="Konto-Menü">
+                <Avatar name={user.displayName} size={26} />
+                <span className="grow ellipsis small" style={{ fontWeight: 700 }}>{user.displayName}</span>
+              </button>
+            )}
+          >
+            <div className="menu-label">
+              <div style={{ fontWeight: 700 }}>{user.displayName}</div>
+              <div className="tiny faint">{user.username}, {ROLE_LABELS[user.role]}</div>
+            </div>
+            <div className="menu-sep" />
+            <MenuItem icon="user-cog" to="/settings">Profil</MenuItem>
+            <MenuItem icon="palette" to="/settings/appearance">Darstellung</MenuItem>
+            <MenuItem icon="key-round" to="/settings/tokens">API-Tokens</MenuItem>
+            {user.role === 'admin' && <MenuItem icon="shield-check" to="/admin">Administration</MenuItem>}
+            <div className="menu-sep" />
+            <MenuItem icon="log-out" onClick={async () => { await logout(); navigate('/login'); }}>Abmelden</MenuItem>
+          </Dropdown>
+          <button className="btn ghost icon sm" onClick={() => updatePreferences({ mode: isDark ? 'light' : 'dark' })} title={isDark ? 'Hell' : 'Dunkel'} aria-label="Hell oder dunkel">
+            <Icon name={isDark ? 'sun' : 'moon'} size={15} />
+          </button>
+          <button className="btn ghost icon sm desktop-only" title="Seitenleiste ausblenden (Strg+\)" aria-label="Seitenleiste ausblenden" onClick={() => updatePreferences({ sidebarCollapsed: true })}>
             <Icon name="chevrons-left" size={15} />
           </button>
         </div>
       </aside>
       <div className="mobile-scrim" onClick={() => setMobileNav(false)} />
 
-      {/* ---------- main ---------- */}
       <div className="main">
-        {!online && (
-          <div className="offline-banner"><Icon name="wifi" size={15} /> Offline – zuletzt besuchte Seiten sind weiterhin lesbar.</div>
-        )}
-        {settings.announcement && (
-          <div className="announcement"><Icon name="bell" size={15} /> {settings.announcement}</div>
-        )}
+        {!online && <div className="offline-banner"><Icon name="wifi" size={15} /> Keine Verbindung. Bereits geöffnete Seiten bleiben lesbar.</div>}
+        {settings.announcement && <div className="announcement"><Icon name="bell" size={15} /> {settings.announcement}</div>}
         <header className="topbar">
-          <button className="btn ghost icon mobile-only" onClick={() => setMobileNav(true)} aria-label="Menü"><Icon name="menu" /></button>
+          <button className="btn ghost icon mobile-only" onClick={() => setMobileNav(true)} aria-label="Navigation öffnen"><Icon name="menu" /></button>
           {collapsed && (
-            <button className="btn ghost icon sm desktop-only" title="Seitenleiste ausklappen" onClick={() => updatePreferences({ sidebarCollapsed: false })}>
+            <button className="btn ghost icon sm desktop-only" title="Seitenleiste einblenden" aria-label="Seitenleiste einblenden" onClick={() => updatePreferences({ sidebarCollapsed: false })}>
               <Icon name="chevrons-right" size={15} />
             </button>
           )}
-          <nav className="crumbs" aria-label="Brotkrumen">
+          <nav className="crumbs" aria-label="Pfad">
             {crumbs.map((c, i) => (
               <span key={i} className="row" style={{ gap: 6, minWidth: 0 }}>
                 {i > 0 && <span className="sep">/</span>}
@@ -221,7 +167,7 @@ export default function Layout() {
           </nav>
           <div className="topbar-actions">
             <button className="search-trigger" onClick={() => setPaletteOpen(true)} aria-label="Suche öffnen">
-              <Icon name="search" size={15} /> <span>Seiten, Tags, Hosts suchen …</span> <span className="kbd">Strg K</span>
+              <Icon name="search" size={15} /> <span>Suchen</span> <span className="kbd">Strg K</span>
             </button>
             {user.role !== 'viewer' && (
               <Link to={space && canWriteSpace ? `/new?space=${space.key}` : '/new'} className="btn primary sm">
@@ -231,7 +177,7 @@ export default function Layout() {
           </div>
         </header>
         <Outlet context={ctx} />
-        {settings.footerText && <footer className="faint small" style={{ textAlign: 'center', padding: 20 }}>{settings.footerText}</footer>}
+        {settings.footerText && <footer className="faint small" style={{ padding: '20px 40px' }}>{settings.footerText}</footer>}
       </div>
       <CommandPalette />
     </div>

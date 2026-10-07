@@ -33,7 +33,6 @@ export default function Search() {
     <div className="content narrow">
       <div className="page-head">
         <div>
-          <span className="eyebrow">Systemweite Suche</span>
           <h1>Suche</h1>
           <p>Volltext über Titel, Inhalte und Eigenschaften (z. B. IP-Adressen oder Hostnamen). Unterstützt <code className="mono">tag:</code>, <code className="mono">space:</code>, <code className="mono">type:</code>, <code className="mono">#tag</code> und „exakte Phrasen“.</p>
         </div>
@@ -53,7 +52,7 @@ export default function Search() {
           <option value="">Alle Typen</option>
           {Object.entries(PAGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        {res && <span className="faint small" style={{ alignSelf: 'center', marginLeft: 'auto' }}>{res.total} Treffer · {res.tookMs} ms</span>}
+        {res && <span className="faint small" style={{ alignSelf: 'center', marginLeft: 'auto' }}>{res.total} Treffer in {res.tookMs} ms</span>}
         {loading && <Spinner />}
       </div>
 
@@ -76,7 +75,7 @@ export default function Search() {
         <Link key={p.id} to={`/p/${p.id}`} className="result">
           <div className="row small faint">
             <PageIcon icon={p.icon} fallback={PAGE_TYPES[p.pageType]?.icon} size={14} />
-            <span style={{ color: p.spaceColor }}>{p.spaceName}</span> · <span>{PAGE_TYPES[p.pageType]?.label}</span> · <span>{timeAgo(p.updatedAt)}</span>
+            <span className="cable" style={{ '--sc': p.spaceColor }} /><span>{p.spaceName}</span>{p.pageType !== 'doc' && <span className="tape">{PAGE_TYPES[p.pageType]?.label}</span>}<span>geändert {timeAgo(p.updatedAt)}</span>
           </div>
           <h4>{p.title}</h4>
           {p.snippet && <Snippet text={p.snippet} className="small muted" />}

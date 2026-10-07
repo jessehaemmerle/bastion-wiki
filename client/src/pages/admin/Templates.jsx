@@ -52,7 +52,7 @@ export default function Templates() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">Inhalte</span><h1>Vorlagen</h1><p>Vorlagen für einheitliche Dokumentation – Runbooks, Hosts, Incidents, Changes …</p></div>
+        <div><h1>Vorlagen</h1><p>Vorlagen für einheitliche Dokumentation – Runbooks, Hosts, Incidents, Changes …</p></div>
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> Vorlage anlegen</button>
       </div>
       {loading ? <Spinner /> : (
@@ -60,7 +60,7 @@ export default function Templates() {
           {data.templates.map((t) => (
             <div key={t.id} className="card pad col" style={{ gap: 10 }}>
               <div className="row between">
-                <span className="space-chip" style={{ '--sc': 'var(--accent)' }}><Icon name={t.icon} size={16} /></span>
+                <Icon name={t.icon} size={18} />
                 <div className="row" style={{ gap: 2 }}>
                   <button className="btn ghost icon sm" onClick={() => setEdit(t)} aria-label="Bearbeiten"><Icon name="edit" size={14} /></button>
                   <button className="btn ghost icon sm" onClick={() => setDel(t)} aria-label="Löschen"><Icon name="trash" size={14} /></button>
@@ -69,8 +69,8 @@ export default function Templates() {
               <h3 style={{ margin: 0, fontFamily: 'var(--font-display)' }}>{t.name}</h3>
               <div className="small muted grow">{t.description}</div>
               <div className="row wrap" style={{ gap: 4 }}>
-                <span className="badge mono">{PAGE_TYPES[t.pageType]?.label || t.pageType}</span>
-                {t.isBuiltin && <span className="badge">mitgeliefert</span>}
+                <span className="tape">{PAGE_TYPES[t.pageType]?.label || t.pageType}</span>
+                {t.isBuiltin && <span className="badge">Standard</span>}
                 {Object.keys(t.properties).length > 0 && <span className="badge">{Object.keys(t.properties).length} Eigenschaften</span>}
               </div>
             </div>

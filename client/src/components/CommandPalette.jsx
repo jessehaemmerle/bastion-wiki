@@ -115,7 +115,7 @@ export default function CommandPalette() {
             lastType = it.type;
             return (
               <div key={it.key}>
-                {header && <div className="palette-group eyebrow">{header}</div>}
+                {header && <div className="palette-group">{header}</div>}
                 <div
                   className={`palette-item ${i === active ? 'active' : ''}`}
                   onMouseMove={() => setActive(i)}
@@ -127,7 +127,7 @@ export default function CommandPalette() {
                         <PageIcon icon={it.data.icon} fallback={PAGE_TYPES[it.data.pageType]?.icon} />
                       </span>
                       <div className="grow">
-                        <div className="pi-title">{it.data.title} <span className="faint tiny mono">· {it.data.spaceName}</span></div>
+                        <div className="pi-title">{it.data.title} <span className="faint small" style={{ fontWeight: 400, marginLeft: 6 }}>{it.data.spaceName}</span></div>
                         {it.data.snippet && <Snippet className="pi-snippet" text={it.data.snippet} />}
                       </div>
                     </>

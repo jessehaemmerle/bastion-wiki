@@ -3,7 +3,7 @@ import { many, query } from '../db/index.js';
 export const DEFAULT_SETTINGS = {
   siteName: 'Bastion',
   tagline: 'Die Wissensbasis für dein Ops-Team',
-  defaultTheme: 'aurora',
+  defaultTheme: 'rack',
   defaultMode: 'system',
   accentColor: '',
   allowRegistration: false,

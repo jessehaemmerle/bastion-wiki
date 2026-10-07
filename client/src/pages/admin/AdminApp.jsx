@@ -13,7 +13,7 @@ import Audit from './Audit.jsx';
 import System from './System.jsx';
 
 const NAV = [
-  ['Übersicht', [['', 'gauge', 'Dashboard']]],
+  ['Übersicht', [['', 'gauge', 'Systemstatus']]],
   ['Zugriff', [['users', 'users', 'Benutzer'], ['groups', 'user-cog', 'Gruppen'], ['spaces', 'shield', 'Bereiche & Rechte']]],
   ['Inhalte', [['templates', 'layers', 'Vorlagen'], ['tags', 'tags', 'Tags']]],
   ['System', [['branding', 'palette', 'Branding & Theming'], ['audit', 'scroll', 'Audit-Log'], ['system', 'server-cog', 'Wartung & Export']]],
@@ -23,18 +23,17 @@ export default function AdminApp() {
   const { settings, user, updatePreferences } = useApp();
   return (
     <div className="admin-shell">
-      <div className="backdrop" />
-      <nav className="admin-nav" aria-label="Admin-Navigation">
-        <div className="admin-brand">
-          <Link to="/" className="rail-logo"><Logo /></Link>
+      <nav className="admin-nav" aria-label="Administration">
+        <Link to="/admin" className="admin-brand">
+          <Logo />
           <div>
             <strong>{settings.siteName}</strong>
-            <span className="badge accent">Admin-Panel</span>
+            <span className="tape">Administration</span>
           </div>
-        </div>
+        </Link>
         {NAV.map(([group, items]) => (
           <div key={group}>
-            <div className="eyebrow">{group}</div>
+            <div className="group">{group}</div>
             {items.map(([path, icon, label]) => (
               <NavLink key={path} to={`/admin${path ? `/${path}` : ''}`} end={!path} className="nav-item">
                 <Icon name={icon} size={16} /> {label}
@@ -47,10 +46,9 @@ export default function AdminApp() {
       </nav>
       <div className="admin-main">
         <header className="admin-top">
-          <span className="eyebrow">control center</span>
-          <span className="status-pill">system online</span>
+          <span className="status">System erreichbar</span>
           <div className="grow" />
-          <button className="btn ghost icon sm" onClick={() => updatePreferences({ mode: document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark' })} aria-label="Modus wechseln">
+          <button className="btn ghost icon sm" onClick={() => updatePreferences({ mode: document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark' })} aria-label="Hell oder dunkel">
             <Icon name={document.documentElement.dataset.mode === 'dark' ? 'sun' : 'moon'} size={16} />
           </button>
           <span className="small muted">{user.displayName}</span>

@@ -37,7 +37,7 @@ function Profile() {
           <Avatar name={f.displayName || user.username} size={56} />
           <div>
             <div style={{ fontWeight: 650, fontSize: 18 }}>{user.displayName}</div>
-            <div className="faint small mono">@{user.username} · {ROLE_LABELS[user.role]}</div>
+            <div className="muted small">{user.username}, {ROLE_LABELS[user.role]}</div>
           </div>
         </div>
         <div className="form-grid">
@@ -225,7 +225,7 @@ export default function UserSettings() {
   useEffect(() => { window.scrollTo(0, 0); }, [tab]);
   return (
     <div className="content narrow">
-      <div className="page-head"><div><span className="eyebrow">Konto</span><h1>Einstellungen</h1></div></div>
+      <div className="page-head"><div><h1>Einstellungen</h1></div></div>
       <div className="tabs">
         {TABS.map(([id, icon, label]) => (
           <button key={id} className={`tab ${tab === id ? 'active' : ''}`} onClick={() => navigate(`/settings/${id}`)}><Icon name={icon} size={15} /> {label}</button>

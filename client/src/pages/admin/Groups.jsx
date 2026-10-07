@@ -52,7 +52,7 @@ export default function Groups() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">Zugriff</span><h1>Gruppen</h1><p>Gruppen bündeln Personen – Bereichsrechte vergibst du dann einmal pro Gruppe.</p></div>
+        <div><h1>Gruppen</h1><p>Gruppen bündeln Personen – Bereichsrechte vergibst du dann einmal pro Gruppe.</p></div>
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> Gruppe anlegen</button>
       </div>
       {loading ? <Spinner /> : !data.groups.length ? (
@@ -73,7 +73,7 @@ export default function Groups() {
                 {g.members.slice(0, 8).map((m, i) => <span key={m.id} style={{ marginLeft: i ? -8 : 0 }}><Avatar name={m.displayName} size={28} /></span>)}
                 {g.members.length > 8 && <span className="faint small" style={{ marginLeft: 6 }}>+{g.members.length - 8}</span>}
               </div>
-              <div className="row faint tiny mono"><span>{g.members.length} Mitglieder</span>·<span>{g.spaceCount} Bereichsrechte</span></div>
+              <div className="small muted">{g.members.length} Mitglieder, Rechte in {g.spaceCount} Bereichen</div>
             </div>
           ))}
         </div>

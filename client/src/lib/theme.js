@@ -1,19 +1,20 @@
 export const THEMES = [
-  { id: 'aurora', name: 'Aurora', desc: 'Violett & Cyan', dark: ['#0a0d14', '#131826', '#8b6cff', '#22d3ee'], light: ['#f6f6fb', '#ffffff', '#6d4aff', '#0891b2'] },
-  { id: 'phosphor', name: 'Phosphor', desc: 'Terminal-Grün, Monospace', dark: ['#050906', '#0c140f', '#39ff88', '#ffb02e'], light: ['#f3f1e7', '#fbfaf4', '#0f8a45', '#b26b00'] },
-  { id: 'nord', name: 'Nord', desc: 'Arktisch & ruhig', dark: ['#242933', '#2e3440', '#88c0d0', '#b48ead'], light: ['#eceff4', '#f8f9fb', '#5e81ac', '#b48ead'] },
-  { id: 'solarized', name: 'Solarized', desc: 'Der Klassiker', dark: ['#00212b', '#002b36', '#2aa198', '#b58900'], light: ['#fdf6e3', '#fffbef', '#268bd2', '#cb4b16'] },
-  { id: 'ember', name: 'Ember', desc: 'Warm & glühend', dark: ['#100b09', '#1c1410', '#ff7a45', '#ffcc4d'], light: ['#fdf8f4', '#ffffff', '#e8572a', '#c78a00'] },
-  { id: 'graphite', name: 'Graphite', desc: 'Neutral & sachlich', dark: ['#111113', '#1b1b1e', '#3b82f6', '#a1a1aa'], light: ['#fafafa', '#ffffff', '#2563eb', '#71717a'] },
+  { id: 'rack', name: 'Rack', desc: 'Lichtgrau, Anthrazit, Signalblau', dark: ['#24292c', '#2b3135', '#7fb0e0', '#f2c200'], light: ['#fafaf8', '#e6e8e5', '#1f5f99', '#f2c200'] },
+  { id: 'leitstand', name: 'Leitstand', desc: 'Gedämpftes Grün wie im Kontrollraum', dark: ['#1f2620', '#263027', '#8cc196', '#e89b4a'], light: ['#f4f5f0', '#dfe2d8', '#3d6b45', '#d9822b'] },
+  { id: 'blueprint', name: 'Blueprint', desc: 'Lichtpause: Preußischblau auf Weiß', dark: ['#12345a', '#163c66', '#ffffff', '#ffcf70'], light: ['#f5f8fb', '#e2e9f1', '#0f4c8a', '#c2410c'] },
+  { id: 'vt220', name: 'VT220', desc: 'Bernstein-Terminal, alles in Mono', dark: ['#1d160a', '#241b0d', '#ffb000', '#ffd98a'], light: ['#fbf7ef', '#efe7d6', '#9a5b00', '#33260f'] },
+  { id: 'nord', name: 'Nord', desc: 'Die bekannte Nord-Palette', dark: ['#2e3440', '#3b4252', '#88c0d0', '#ebcb8b'], light: ['#eceff4', '#e1e5ec', '#5e81ac', '#d08770'] },
+  { id: 'solarized', name: 'Solarized', desc: 'Ethan Schoonovers Klassiker', dark: ['#002b36', '#073642', '#2aa198', '#b58900'], light: ['#fdf6e3', '#f2ead3', '#268bd2', '#b58900'] },
 ];
 
-export const ACCENTS = ['#8b6cff', '#3b82f6', '#06b6d4', '#10b981', '#39ff88', '#84cc16', '#f59e0b', '#ff7a45', '#ef4444', '#ec4899', '#a855f7'];
+// RAL signal / traffic colours
+export const ACCENTS = ['#1f5f99', '#0e518d', '#007577', '#2f7d45', '#4d6f39', '#9a5b00', '#c1121c', '#8e1f3f', '#5b5b9a', '#383e42'];
 
 const media = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: light)') : null;
 
 export function resolveTheme(settings = {}, prefs = {}) {
   const theme = THEMES.some((t) => t.id === prefs.theme) ? prefs.theme
-    : THEMES.some((t) => t.id === settings.defaultTheme) ? settings.defaultTheme : 'aurora';
+    : THEMES.some((t) => t.id === settings.defaultTheme) ? settings.defaultTheme : 'rack';
   const mode = prefs.mode || settings.defaultMode || 'system';
   const accent = prefs.accent || settings.accentColor || '';
   return { theme, mode, accent, density: prefs.density || 'comfortable', font: prefs.font || 'sans' };

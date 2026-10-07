@@ -24,7 +24,7 @@ export default function AdminTags() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">Inhalte</span><h1>Tags</h1><p>Umbenennen, einfärben oder zusammenführen. Wird ein Tag auf einen bestehenden Namen umbenannt, werden beide zusammengeführt.</p></div>
+        <div><h1>Tags</h1><p>Umbenennen, einfärben oder zusammenführen. Wird ein Tag auf einen bestehenden Namen umbenannt, werden beide zusammengeführt.</p></div>
       </div>
       <div className="card">
         <div className="card-header">

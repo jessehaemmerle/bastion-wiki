@@ -31,7 +31,7 @@ function UserModal({ user, groups, onClose, onSaved }) {
   };
   const genPw = () => set('password', Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 56]).join(''));
   return (
-    <Modal title={user ? `Benutzer bearbeiten · @${user.username}` : 'Neuer Benutzer'} icon="user" size="lg" onClose={onClose}
+    <Modal title={user ? `${user.username} bearbeiten` : 'Neuer Benutzer'} icon="user" size="lg" onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" onClick={save}><Icon name="save" /> Speichern</button></>}>
       <div className="form-grid">
         <div className="field"><label>Benutzername</label><input className="input mono" value={f.username} disabled={!!user} onChange={(e) => set('username', e.target.value)} autoFocus={!user} /></div>
@@ -83,7 +83,7 @@ export default function Users() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">Zugriff</span><h1>Benutzer</h1><p>Konten, Rollen und Gruppenzugehörigkeit verwalten.</p></div>
+        <div><h1>Benutzer</h1><p>Konten, Rollen und Gruppenzugehörigkeit verwalten.</p></div>
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="user-plus" /> Benutzer anlegen</button>
       </div>
       <div className="card">
@@ -98,7 +98,7 @@ export default function Users() {
               <tbody>
                 {data.users.map((u) => (
                   <tr key={u.id}>
-                    <td><div className="row"><Avatar name={u.displayName} size={30} /><div><div style={{ fontWeight: 600 }}>{u.displayName}</div><div className="tiny faint mono">@{u.username}{u.email ? ` · ${u.email}` : ''}</div></div></div></td>
+                    <td><div className="row"><Avatar name={u.displayName} size={30} /><div><div style={{ fontWeight: 600 }}>{u.displayName}</div><div className="small muted">{u.username}{u.email ? `, ${u.email}` : ''}</div></div></div></td>
                     <td><span className={`badge ${u.role === 'admin' ? 'accent' : ''}`}>{ROLE_LABELS[u.role]}</span></td>
                     <td><div className="row wrap" style={{ gap: 4 }}>{u.groups.map((g) => <span key={g} className="badge">{g}</span>)}</div></td>
                     <td>{u.isActive ? <span className="badge success">aktiv</span> : <span className="badge danger">deaktiviert</span>}</td>

@@ -92,8 +92,8 @@ app.get('/manifest.webmanifest', async (_req, res) => {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: '#0b0f17',
-    theme_color: s.accentColor || '#7c5cff',
+    background_color: '#24292c',
+    theme_color: s.accentColor || '#2b3135',
     lang: 'de',
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

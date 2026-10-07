@@ -18,7 +18,7 @@ export default function Audit() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">System</span><h1>Audit-Log</h1><p>Lückenlose Nachverfolgung sicherheitsrelevanter Ereignisse und Änderungen.</p></div>
+        <div><h1>Audit-Log</h1><p>Lückenlose Nachverfolgung sicherheitsrelevanter Ereignisse und Änderungen.</p></div>
       </div>
       <div className="card">
         <div className="card-header">
@@ -41,7 +41,7 @@ export default function Audit() {
                       <td className="small nowrap mono">{formatDate(e.createdAt, true)}</td>
                       <td><AuditAction action={e.action} /></td>
                       <td className="small">{e.user || <span className="faint">System</span>}</td>
-                      <td className="small faint">{e.entityType ? `${e.entityType} #${e.entityId}` : '—'} {e.details?.title || e.details?.name || e.details?.username ? <span style={{ color: 'var(--text)' }}>· {e.details.title || e.details.name || e.details.username}</span> : null}</td>
+                      <td className="small faint">{e.entityType ? `${e.entityType} #${e.entityId}` : '—'} {e.details?.title || e.details?.name || e.details?.username ? <span style={{ color: 'var(--text)' }}>{e.details.title || e.details.name || e.details.username}</span> : null}</td>
                       <td className="mono tiny faint">{e.ip}</td>
                       <td className="actions"><Icon name={open === e.id ? 'chevron-down' : 'chevron-right'} size={14} /></td>
                     </tr>

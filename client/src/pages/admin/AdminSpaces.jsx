@@ -16,7 +16,7 @@ export default function AdminSpaces() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">Zugriff</span><h1>Bereiche & Berechtigungen</h1><p>Alle Bereiche – auch solche, in denen du selbst nicht Mitglied bist.</p></div>
+        <div><h1>Bereiche & Berechtigungen</h1><p>Alle Bereiche – auch solche, in denen du selbst nicht Mitglied bist.</p></div>
         <button className="btn primary" onClick={() => setEdit({})}><Icon name="plus" /> Bereich anlegen</button>
       </div>
       <div className="card">

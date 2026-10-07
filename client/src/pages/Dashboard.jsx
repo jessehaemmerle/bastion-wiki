@@ -1,116 +1,115 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import PageList from '../components/PageList.jsx';
+import { ActivityBars } from '../components/Charts.jsx';
 import { Spinner } from '../components/ui.jsx';
 import { useApp } from '../lib/context.jsx';
 import { useChrome, useFetch } from '../lib/hooks.js';
-import { formatDate, timeAgo } from '../lib/format.js';
+import { PAGE_TYPES, shortWhen } from '../lib/format.js';
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 5) return 'Nachtschicht';
-  if (h < 11) return 'Guten Morgen';
-  if (h < 17) return 'Guten Tag';
-  if (h < 22) return 'Guten Abend';
-  return 'Späte Schicht';
-}
+const EXAMPLES = ['type:runbook', 'type:host', 'space:infra', 'tag:linux'];
 
-function ActivityBars({ activity }) {
-  const days = [];
-  const map = new Map((activity || []).map((a) => [a.day, a.edits]));
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
-    days.push({ d, n: map.get(d) || 0 });
-  }
-  const max = Math.max(1, ...days.map((x) => x.n));
+function ChangeLog({ pages }) {
+  if (!pages?.length) return <p className="muted small">Noch keine Änderungen.</p>;
   return (
-    <div className="sparkbars" aria-label="Bearbeitungen der letzten 30 Tage">
-      {days.map((x) => (
-        <span key={x.d} title={`${formatDate(x.d)}: ${x.n} Änderungen`} style={{ height: `${Math.max(6, (x.n / max) * 100)}%`, opacity: x.n ? 0.9 : 0.25 }} />
+    <ul className="log">
+      {pages.map((p) => (
+        <li key={p.id}>
+          <span className="when" title={new Date(p.updatedAt).toLocaleString('de-DE')}>{shortWhen(p.updatedAt)}</span>
+          <div className="what">
+            <Link to={`/p/${p.id}`}>{p.title}</Link>
+            <div className="where">
+              <span className="cable" style={{ '--sc': p.spaceColor }} /> {p.spaceName}
+              {p.updatedBy && <span className="faint">{p.updatedBy}</span>}
+            </div>
+          </div>
+          {p.pageType !== 'doc' ? <span className="tape">{PAGE_TYPES[p.pageType]?.label}</span> : <span />}
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
 export default function Dashboard() {
-  const { user, spaces, settings } = useApp();
+  const { user, spaces } = useApp();
+  const navigate = useNavigate();
   const { data, loading } = useFetch('/dashboard');
-  useChrome([{ label: 'Dashboard' }]);
+  const [q, setQ] = useState('');
+  useChrome([{ label: 'Start' }]);
 
   if (loading && !data) return <Spinner center />;
   const s = data?.stats || {};
-  const totalEdits = (data?.activity || []).reduce((a, b) => a + b.edits, 0);
+  const search = (term) => navigate(`/search?q=${encodeURIComponent(term)}`);
 
   return (
     <div className="content">
-      <section className="hero">
-        <div className="terminal-line"><b>{user.username}@{(settings.siteName || 'bastion').toLowerCase()}</b>:~$ status --overview<span className="cursor" /></div>
-        <h1>{greeting()}, {user.displayName.split(' ')[0]}.</h1>
-        <p>
-          {s.overdue
-            ? `${s.overdue} ${s.overdue === 1 ? 'Seite wartet' : 'Seiten warten'} auf ein Review. `
-            : 'Alle Reviews sind erledigt – die Doku ist frisch. '}
-          {s.updated_week ? `${s.updated_week} Seiten wurden diese Woche aktualisiert.` : ''}
-        </p>
-        <div className="hero-actions">
-          {user.role !== 'viewer' && <Link to="/new" className="btn primary"><Icon name="plus" /> Neue Seite</Link>}
-          <Link to="/search" className="btn"><Icon name="search" /> Suchen</Link>
-          {s.overdue > 0 && <Link to="/review" className="btn"><Icon name="calendar-clock" /> Reviews ansehen</Link>}
+      <form className="start-search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) search(q.trim()); }}>
+        <h1>Wonach suchst du?</h1>
+        <label className="big-search">
+          <Icon name="search" size={20} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hostname, IP-Adresse, Fehlermeldung, Runbook …" aria-label="Wiki durchsuchen" />
+          <button className="btn primary" type="submit">Suchen</button>
+        </label>
+        <div className="hints">
+          <span>Filter:</span>
+          {EXAMPLES.map((ex) => <button type="button" key={ex} onClick={() => setQ(`${ex} `)}>{ex}</button>)}
         </div>
-      </section>
+      </form>
 
-      <div className="stats">
-        <div className="stat"><Icon name="files" className="stat-icon" /><span className="stat-value">{s.pages ?? 0}</span><span className="stat-label">Seiten</span></div>
-        <div className="stat"><Icon name="grid" className="stat-icon" /><span className="stat-value">{spaces.length}</span><span className="stat-label">Bereiche</span></div>
-        <div className="stat"><Icon name="tags" className="stat-icon" /><span className="stat-value">{s.tags ?? 0}</span><span className="stat-label">Tags</span></div>
-        <div className={`stat ${s.overdue ? 'warn' : ''}`}><Icon name="calendar-clock" className="stat-icon" /><span className="stat-value">{s.overdue ?? 0}</span><span className="stat-label">Reviews überfällig</span></div>
-        <div className="stat" style={{ gridColumn: 'span 2', minWidth: 0 }}>
-          <div className="row between"><span className="stat-label">Aktivität (30 Tage)</span><span className="mono tiny faint">{totalEdits} Änderungen</span></div>
-          <ActivityBars activity={data?.activity} />
-        </div>
-      </div>
+      <p className="summary-line">
+        <strong>{s.pages ?? 0}</strong> Seiten in <strong>{spaces.length}</strong> Bereichen, <strong>{s.updated_week ?? 0}</strong> davon diese Woche geändert.
+        {s.overdue > 0 && <> <Link to="/review">{s.overdue} {s.overdue === 1 ? 'Seite muss' : 'Seiten müssen'} geprüft werden.</Link></>}
+      </p>
 
-      <div className="grid-2">
-        {data?.pinned?.length > 0 && (
-          <div className="card">
-            <div className="card-header"><h3 className="row"><Icon name="pin" /> Angepinnt</h3></div>
-            <PageList pages={data.pinned} />
-          </div>
-        )}
-        <div className="card">
-          <div className="card-header"><h3 className="row"><Icon name="activity" /> Zuletzt geändert</h3><Link to="/search?q=&sort=updated" className="small">Alle</Link></div>
-          <PageList pages={data?.recent} />
+      <div className="start-grid">
+        <div>
+          <section>
+            <div className="section-h"><h2>Letzte Änderungen</h2></div>
+            <ChangeLog pages={data?.recent} />
+          </section>
+          {data?.mine?.length > 0 && (
+            <section>
+              <div className="section-h"><h2>Von dir bearbeitet</h2></div>
+              <ChangeLog pages={data.mine} />
+            </section>
+          )}
         </div>
-        <div className="card">
-          <div className="card-header"><h3 className="row"><Icon name="star" /> Favoriten</h3></div>
-          <PageList pages={data?.favorites} empty="Markiere Seiten mit dem Stern, um sie hier zu sehen." />
+        <div>
+          {data?.pinned?.length > 0 && (
+            <section>
+              <div className="section-h"><h2>Angepinnt</h2></div>
+              <PageList pages={data.pinned} />
+            </section>
+          )}
+          <section>
+            <div className="section-h"><h2>Zu prüfen</h2><Link to="/review">Alle</Link></div>
+            <PageList pages={data?.reviewDue} showReview empty="In den nächsten 7 Tagen ist kein Review fällig." />
+          </section>
+          <section>
+            <div className="section-h"><h2>Favoriten</h2></div>
+            <PageList pages={data?.favorites} empty="Markiere Seiten mit dem Stern, um sie hier abzulegen." />
+          </section>
+          <section>
+            <div className="section-h"><h2>Bereiche</h2><Link to="/spaces">Übersicht</Link></div>
+            <table className="space-index">
+              <tbody>
+                {spaces.map((sp) => (
+                  <tr key={sp.id}>
+                    <td><span className="stripe" style={{ '--sc': sp.color }} /></td>
+                    <td><Link to={`/s/${sp.key}`}>{sp.name}</Link><div className="small muted">{sp.description}</div></td>
+                    <td className="small muted nowrap" style={{ textAlign: 'right' }}>{sp.pageCount} Seiten</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {user.role !== 'viewer' && <Link to="/spaces?new=1" className="btn sm" style={{ marginTop: 10 }}><Icon name="plus" size={14} /> Bereich anlegen</Link>}
+          </section>
+          <section>
+            <div className="section-h"><h2>Änderungen, 30 Tage</h2></div>
+            <ActivityBars activity={data?.activity} />
+          </section>
         </div>
-        <div className="card">
-          <div className="card-header"><h3 className="row"><Icon name="calendar-clock" /> Review fällig</h3><Link to="/review" className="small">Alle</Link></div>
-          <PageList pages={data?.reviewDue} showReview empty="Keine Reviews in den nächsten 7 Tagen. 🎉" />
-        </div>
-        {data?.mine?.length > 0 && (
-          <div className="card">
-            <div className="card-header"><h3 className="row"><Icon name="pen" /> Deine letzten Änderungen</h3></div>
-            <PageList pages={data.mine} />
-          </div>
-        )}
-      </div>
-
-      <div className="section-title" style={{ marginTop: 32 }}>
-        <span className="eyebrow">Bereiche</span>
-        <Link to="/spaces" className="small">Alle Bereiche</Link>
-      </div>
-      <div className="grid-3">
-        {spaces.slice(0, 8).map((sp) => (
-          <Link key={sp.id} to={`/s/${sp.key}`} className="space-card" style={{ '--sc': sp.color }}>
-            <span className="space-key">{sp.key}</span>
-            <span className="space-chip"><Icon name={sp.icon} size={16} /></span>
-            <h3>{sp.name}</h3>
-            <p>{sp.description || 'Keine Beschreibung'}</p>
-            <div className="space-meta"><span>{sp.pageCount} Seiten</span><span>{sp.updatedAt ? timeAgo(sp.updatedAt) : '—'}</span></div>
-          </Link>
-        ))}
       </div>
     </div>
   );

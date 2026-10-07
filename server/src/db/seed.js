@@ -175,10 +175,10 @@ async function seedDemo(admin) {
     const sec = await mkSpace('security', 'Security', 'Härtung, Zertifikate, Zugänge und Audits', 'shield', '#ef4444', 2);
     const inc = await mkSpace('incidents', 'Incidents', 'Postmortems und Störungsberichte', 'siren', '#f59e0b', 3);
 
-    await mkPage(infra, null, 'Willkommen bei Bastion', 'willkommen', 'doc', `
-<p>Bastion ist eure Wissensbasis für den IT-Betrieb. Ein paar Tipps für den Einstieg:</p>
+    await mkPage(infra, null, 'So funktioniert dieses Wiki', 'so-funktioniert-dieses-wiki', 'doc', `
+<p>Diese Seite erklärt kurz, wie das Wiki aufgebaut ist. Du kannst sie löschen, sobald ihr eigene Inhalte habt.</p>
 ${callout('tip', '<p>Drücke <kbd>Strg</kbd> + <kbd>K</kbd> für die <strong>Befehlspalette</strong> und systemweite Suche. Filter wie <code>tag:linux</code>, <code>space:ops</code> oder <code>type:runbook</code> funktionieren direkt im Suchfeld.</p>')}
-<h2>Was kann Bastion?</h2>
+<h2>Aufbau</h2>
 <ul>
 <li><p><strong>Bereiche</strong> mit eigenen Berechtigungen für Teams und Gruppen</p></li>
 <li><p><strong>Vorlagen</strong> für Runbooks, Postmortems, Server-Steckbriefe und Changes</p></li>
@@ -189,10 +189,10 @@ ${callout('tip', '<p>Drücke <kbd>Strg</kbd> + <kbd>K</kbd> für die <strong>Bef
 </ul>
 <h2>API-Beispiel</h2>
 ${code('bash', `curl -H "Authorization: Bearer bst_…" \\\n     "https://wiki.example.com/api/search?q=nginx%20tag:runbook"`)}`,
-    ['intro'], {}, { pinned: true, icon: '👋' });
+    ['intro'], {}, { pinned: true });
 
     const net = await mkPage(infra, null, 'Netzwerk', 'netzwerk', 'doc', `<p>Übersicht über alle Netzsegmente.</p>
-${table(['VLAN', 'Subnetz', 'Zweck'], ['10', '10.0.10.0/24', 'Server'], ['20', '10.0.20.0/24', 'Clients'], ['99', '10.0.99.0/24', 'Management'])}`, ['netzwerk'], {}, { icon: '🌐' });
+${table(['VLAN', 'Subnetz', 'Zweck'], ['10', '10.0.10.0/24', 'Server'], ['20', '10.0.20.0/24', 'Clients'], ['99', '10.0.99.0/24', 'Management'])}`, ['netzwerk'], {}, {});
     await mkPage(infra, net, 'VLAN 10 – Server', 'vlan-10-server', 'network', BUILTIN_TEMPLATES[5].content, ['netzwerk', 'vlan'], BUILTIN_TEMPLATES[5].properties);
     await mkPage(infra, null, 'srv-web-01', 'srv-web-01', 'host', BUILTIN_TEMPLATES[2].content, ['server', 'linux', 'nginx'],
       { Hostname: 'srv-web-01', 'IP-Adresse': '10.0.10.11', Betriebssystem: 'Debian 12', Umgebung: 'Produktion', Standort: 'RZ1 / Rack A1', Verantwortlich: 'Team Web' },
@@ -205,22 +205,22 @@ ${callout('warning', '<p>Vorher prüfen, ob Port 80 von außen erreichbar ist.</
 ${code('bash', 'sudo certbot renew --dry-run\nsudo certbot renew\nsudo systemctl reload nginx')}
 <h2>Verifikation</h2>
 ${code('bash', 'echo | openssl s_client -connect example.com:443 2>/dev/null | openssl x509 -noout -dates')}
-${tasks(task('Ablaufdatum > 60 Tage'), task('Monitoring-Check grün'))}`, ['runbook', 'tls', 'nginx'], { Service: 'nginx', Dauer: '~5 min', Risiko: 'niedrig' }, { icon: '🔐' });
+${tasks(task('Ablaufdatum > 60 Tage'), task('Monitoring-Check grün'))}`, ['runbook', 'tls', 'nginx'], { Service: 'nginx', Dauer: '~5 min', Risiko: 'niedrig' }, {});
 
     await mkPage(ops, null, 'Festplatte voll – Erste Hilfe', 'festplatte-voll', 'runbook', `
 <h2>Diagnose</h2>
 ${code('bash', 'df -h\nsudo du -xh / --max-depth=2 2>/dev/null | sort -h | tail -20\nsudo journalctl --disk-usage')}
 <h2>Schnelle Abhilfe</h2>
 ${code('bash', 'sudo journalctl --vacuum-time=7d\nsudo apt-get clean\ndocker system prune -f')}
-${callout('danger', '<p>Niemals Dateien in <code>/var/lib/postgresql</code> löschen!</p>')}`, ['runbook', 'linux', 'storage'], { Risiko: 'mittel' }, { pinned: true, icon: '💾' });
+${callout('danger', '<p>Niemals Dateien in <code>/var/lib/postgresql</code> löschen!</p>')}`, ['runbook', 'linux', 'storage'], { Risiko: 'mittel' }, { pinned: true });
 
     await mkPage(ops, null, 'On-Call Übergabe', 'on-call', 'checklist', `<p>Checkliste für die wöchentliche Übergabe.</p>
-${tasks(task('Offene Incidents besprochen', true), task('Geplante Changes der Woche geprüft'), task('Alert-Rauschen reviewt'), task('Pager-Weiterleitung umgestellt'))}`, ['on-call'], {}, { icon: '📟' });
+${tasks(task('Offene Incidents besprochen', true), task('Geplante Changes der Woche geprüft'), task('Alert-Rauschen reviewt'), task('Pager-Weiterleitung umgestellt'))}`, ['on-call'], {}, {});
 
     await mkPage(sec, null, 'SSH-Härtung', 'ssh-haertung', 'howto', `
 <p>Empfohlene Basiskonfiguration für <code>/etc/ssh/sshd_config</code>:</p>
 ${code('ini', 'PermitRootLogin no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nAllowGroups ssh-users\nMaxAuthTries 3')}
-${code('bash', 'sudo sshd -t && sudo systemctl reload ssh')}`, ['security', 'linux', 'ssh'], {}, { icon: '🛡️' });
+${code('bash', 'sudo sshd -t && sudo systemctl reload ssh')}`, ['security', 'linux', 'ssh'], {}, {});
 
     await mkPage(inc, null, '2026-09-12 – Ausfall Datenbank-Cluster', '2026-09-12-db-ausfall', 'incident', BUILTIN_TEMPLATES[1].content, ['incident', 'postmortem', 'postgres'],
       { Schweregrad: 'SEV-1', Status: 'gelöst', Beginn: '2026-09-12 03:12', Ende: '2026-09-12 04:40', 'Betroffene Dienste': 'API, Webshop' });

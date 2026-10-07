@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon, { PageIcon } from '../components/Icon.jsx';
 import ContentView from '../components/ContentView.jsx';
-import { Avatar, Confirm, Dropdown, MenuItem, Modal, Spinner, TagPill, useCopy } from '../components/ui.jsx';
+import { Confirm, Dropdown, MenuItem, Modal, Spinner, TagPill, useCopy } from '../components/ui.jsx';
 import NotFound from './NotFound.jsx';
 import { api } from '../lib/api.js';
 import { useApp } from '../lib/context.jsx';
@@ -32,7 +32,7 @@ function Toc({ headings }) {
   if (!headings.length) return null;
   return (
     <div>
-      <div className="eyebrow" style={{ marginBottom: 10 }}>Auf dieser Seite</div>
+      <h4>Inhalt</h4>
       <ul className="toc">
         {headings.map((h) => (
           <li key={h.id} className={`l${h.level}`}>
@@ -117,7 +117,7 @@ export default function PageView() {
   );
 
   useEffect(() => {
-    if (page) document.title = `${page.title} · ${settings.siteName || 'Bastion'}`;
+    if (page) document.title = `${page.title} – ${settings.siteName || 'Bastion'}`;
   }, [page, settings.siteName]);
 
   // "e" to edit
@@ -195,10 +195,13 @@ export default function PageView() {
 
   return (
     <div className="content">
-      <div className={`page-layout ${headings.length < 2 ? '' : ''}`}>
+      <div className="page-layout">
         <article className="page-main">
-          <div className="row between wrap">
-            <span className="eyebrow">{type.label} · {page.space.name}</span>
+          <div className="page-actions">
+            <div className="page-kicker">
+              {page.pageType !== 'doc' && <span className="tape lg">{type.label}</span>}
+              <Link to={`/s/${page.space.key}`} className="row" style={{ gap: 6 }}><span className="cable" style={{ '--sc': page.space.color }} />{page.space.name}</Link>
+            </div>
             <div className="page-toolbar">
               {canWrite && <Link to={`/p/${page.id}/edit`} className="btn primary sm" title="Bearbeiten (E)"><Icon name="pen" size={14} /> Bearbeiten</Link>}
               <button className={`btn sm icon ${page.isFavorite ? 'active' : ''}`} onClick={toggleFavorite} title={page.isFavorite ? 'Favorit entfernen' : 'Als Favorit markieren'}>
@@ -226,12 +229,11 @@ export default function PageView() {
             <span>{page.title}</span>
           </h1>
           <div className="page-meta-line">
-            <span><Avatar name={page.updatedBy || '?'} size={20} /> {page.updatedBy || 'Unbekannt'}</span>
-            <span title={formatDate(page.updatedAt, true)}><Icon name="clock" size={13} /> {timeAgo(page.updatedAt)}</span>
-            <Link to={`/p/${page.id}/history`} className="faint"><Icon name="git-branch" size={13} /> v{page.version}</Link>
-            <span><Icon name="book-open" size={13} /> {readMin} min</span>
-            {page.isPinned && <span><Icon name="pin" size={13} /> angepinnt</span>}
-            {page.reviewDue && !overdue && <span><Icon name="calendar-clock" size={13} /> Review {formatDate(page.reviewDue)}</span>}
+            <span title={formatDate(page.updatedAt, true)}>Geändert {timeAgo(page.updatedAt)}{page.updatedBy ? ` von ${page.updatedBy}` : ''}</span>
+            <Link to={`/p/${page.id}/history`}>Version <span className="mono">{page.version}</span></Link>
+            <span>{readMin} Min. Lesezeit</span>
+            {page.isPinned && <span><Icon name="pin" size={13} /> Angepinnt</span>}
+            {page.reviewDue && !overdue && <span>Nächstes Review {formatDate(page.reviewDue)}</span>}
           </div>
           {page.tags.length > 0 && <div className="page-tags">{page.tags.map((t) => <TagPill key={t.name} name={t.name} color={t.color} />)}</div>}
 
@@ -239,17 +241,16 @@ export default function PageView() {
             <div className="review-banner">
               <Icon name="calendar-clock" size={18} />
               <div className="grow">
-                <strong>Review überfällig</strong> seit {formatDate(page.reviewDue)} – ist der Inhalt noch aktuell?
+                <strong>Review seit {formatDate(page.reviewDue)} überfällig.</strong> Prüfe, ob der Inhalt noch stimmt, und bestätige es.
               </div>
-              {canWrite && <button className="btn sm" onClick={markReviewed}><Icon name="check" size={14} /> Geprüft</button>}
+              {canWrite && <button className="btn sm" onClick={markReviewed}><Icon name="check" size={14} /> Als geprüft markieren</button>}
             </div>
           )}
 
           {props.length > 0 && (
             <section className="spec" aria-label="Eigenschaften">
               <div className="spec-head">
-                <span className="eyebrow plain"><Icon name={type.icon} size={13} /> Eigenschaften</span>
-                <span className="faint tiny mono">{props.length} Felder</span>
+                <span>Datenblatt</span>
               </div>
               <div className="spec-grid">
                 {props.map(([k, v]) => (
@@ -271,12 +272,12 @@ export default function PageView() {
 
           <ContentView html={page.content} onHeadings={onHeadings} onToggleTask={canWrite ? toggleTask : undefined} />
           {!page.content?.replace(/<[^>]+>/g, '').trim() && !page.content?.includes('<img') && (
-            <div className="faint" style={{ padding: '20px 0' }}>Diese Seite ist noch leer. {canWrite && <Link to={`/p/${page.id}/edit`}>Jetzt Inhalt hinzufügen</Link>}</div>
+            <div className="faint" style={{ padding: '20px 0' }}>Diese Seite hat noch keinen Inhalt. {canWrite && <Link to={`/p/${page.id}/edit`}>Seite bearbeiten</Link>}</div>
           )}
 
           {page.children.length > 0 && (
             <>
-              <div className="section-title"><span className="eyebrow">Unterseiten</span></div>
+              <div className="section-title"><h3>Unterseiten</h3></div>
               <div className="children-grid">
                 {page.children.map((c) => (
                   <Link key={c.id} to={`/p/${c.id}`} className="child-card">
@@ -290,7 +291,7 @@ export default function PageView() {
           {(page.attachments.length > 0 || canWrite) && (
             <>
               <div className="section-title">
-                <span className="eyebrow">Anhänge ({page.attachments.length})</span>
+                <h3>Anhänge</h3>
                 {canWrite && <button className="btn sm ghost" onClick={() => uploadRef.current?.click()}><Icon name="upload" size={14} /> Hochladen</button>}
               </div>
               <div className="attachments">
@@ -299,12 +300,12 @@ export default function PageView() {
                     <Icon name={a.mimeType.startsWith('image/') ? 'file' : 'paperclip'} size={15} />
                     <a href={`/api/attachments/${a.id}`} target="_blank" rel="noreferrer" className="grow ellipsis">{a.filename}</a>
                     <span className="faint tiny mono">{formatBytes(a.size)}</span>
-                    <span className="faint tiny desktop-only">{a.uploadedBy} · {timeAgo(a.createdAt)}</span>
+                    <span className="faint tiny desktop-only">{a.uploadedBy}, {timeAgo(a.createdAt)}</span>
                     <a className="btn ghost icon sm" href={`/api/attachments/${a.id}?download`} aria-label="Herunterladen"><Icon name="download" size={14} /></a>
                     {canWrite && <button className="btn ghost icon sm" onClick={() => deleteAttachment(a)} aria-label="Löschen"><Icon name="trash" size={14} /></button>}
                   </div>
                 ))}
-                {!page.attachments.length && <div className="faint small">Noch keine Dateien angehängt.</div>}
+                {!page.attachments.length && <div className="faint small">Keine Dateien angehängt.</div>}
               </div>
             </>
           )}
@@ -314,14 +315,13 @@ export default function PageView() {
         <aside className="aside toc-aside">
           <Toc headings={headings} />
           <div>
-            <div className="eyebrow" style={{ marginBottom: 10 }}>Info</div>
-            <div className="col small" style={{ gap: 6 }}>
-              <div className="row between"><span className="faint">Erstellt</span><span>{formatDate(page.createdAt)}</span></div>
-              <div className="row between"><span className="faint">von</span><span>{page.createdBy || '—'}</span></div>
-              <div className="row between"><span className="faint">Geändert</span><span>{formatDate(page.updatedAt)}</span></div>
-              <div className="row between"><span className="faint">Wörter</span><span className="mono">{page.wordCount}</span></div>
-              <div className="row between"><span className="faint">Seiten-ID</span><span className="mono">#{page.id}</span></div>
-            </div>
+            <h4>Über diese Seite</h4>
+            <dl className="facts">
+              <dt>Erstellt</dt><dd>{formatDate(page.createdAt)}</dd>
+              <dt>von</dt><dd>{page.createdBy || 'unbekannt'}</dd>
+              <dt>Wörter</dt><dd>{page.wordCount}</dd>
+              <dt>Seiten-ID</dt><dd className="mono">{page.id}</dd>
+            </dl>
           </div>
         </aside>
       </div>

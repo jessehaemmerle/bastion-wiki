@@ -62,9 +62,8 @@ export default function History() {
     <div className="content">
       <div className="page-head">
         <div>
-          <span className="eyebrow">Versionsverlauf</span>
           <h1>{page.title}</h1>
-          <p>{revisions.length} Versionen · aktuell v{page.version}</p>
+          <p>{revisions.length} Versionen gespeichert, aktuell ist Version {page.version}.</p>
         </div>
         <Link to={`/p/${page.id}`} className="btn"><Icon name="arrow-left" /> Zur Seite</Link>
       </div>
@@ -82,7 +81,7 @@ export default function History() {
                   <div className="grow">
                     <div className="row between"><strong className="mono">v{r.version}</strong><span className="faint tiny">{timeAgo(r.createdAt)}</span></div>
                     <div className="small muted ellipsis">{r.summary || 'Keine Notiz'}</div>
-                    <div className="tiny faint">{r.author || 'Unbekannt'} · {formatDate(r.createdAt, true)}</div>
+                    <div className="tiny faint">{r.author || 'Unbekannt'}, {formatDate(r.createdAt, true)}</div>
                   </div>
                 </button>
               </li>

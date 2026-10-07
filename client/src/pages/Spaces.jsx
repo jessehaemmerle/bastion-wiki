@@ -25,36 +25,30 @@ export default function Spaces() {
     <div className="content">
       <div className="page-head">
         <div>
-          <span className="eyebrow">Übersicht</span>
           <h1>Bereiche</h1>
-          <p>Bereiche trennen Wissen nach Team, System oder Thema – jeder mit eigenen Berechtigungen.</p>
+          <p>Jeder Bereich hat eigene Berechtigungen und einen eigenen Seitenbaum.</p>
         </div>
-        {user.role !== 'viewer' && <button className="btn primary" onClick={() => setCreating(true)}><Icon name="plus" /> Neuer Bereich</button>}
+        {user.role !== 'viewer' && <button className="btn primary" onClick={() => setCreating(true)}><Icon name="plus" /> Bereich anlegen</button>}
       </div>
       {spaces.length === 0 ? (
-        <Empty icon="grid" title="Noch keine Bereiche">Lege den ersten Bereich an, z. B. „Infrastruktur“ oder „Runbooks“.</Empty>
+        <Empty icon="grid" title="Noch keine Bereiche">Ein Bereich bündelt Seiten eines Teams oder Themas, z. B. „Netzwerk“ oder „Runbooks“. Lege den ersten an, um loszulegen.</Empty>
       ) : (
-        <div className="grid-3">
-          {spaces.map((s) => (
-            <Link key={s.id} to={`/s/${s.key}`} className="space-card" style={{ '--sc': s.color }}>
-              <span className="space-key">{s.key}</span>
-              <span className="space-chip"><Icon name={s.icon} size={16} /></span>
-              <h3>{s.name}</h3>
-              <p>{s.description || 'Keine Beschreibung'}</p>
-              <div className="space-meta">
-                <span>{s.pageCount} Seiten</span>
-                <span>{s.updatedAt ? timeAgo(s.updatedAt) : '—'}</span>
-                <span>{ACCESS_LABELS[s.access]}</span>
-              </div>
-            </Link>
-          ))}
-          {user.role !== 'viewer' && (
-            <button className="space-card new" onClick={() => setCreating(true)}>
-              <Icon name="plus" size={24} />
-              <span>Neuer Bereich</span>
-            </button>
-          )}
-        </div>
+        <table className="space-index">
+          <tbody>
+            {spaces.map((s) => (
+              <tr key={s.id}>
+                <td><span className="stripe" style={{ '--sc': s.color }} /></td>
+                <td>
+                  <Link to={`/s/${s.key}`}>{s.name}</Link>
+                  <div className="small muted">{s.description || 'Ohne Beschreibung'}</div>
+                </td>
+                <td className="small muted nowrap">{s.pageCount} Seiten</td>
+                <td className="small muted nowrap desktop-only">{s.updatedAt ? `geändert ${timeAgo(s.updatedAt)}` : 'leer'}</td>
+                <td className="small muted nowrap desktop-only">{ACCESS_LABELS[s.access]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
       {creating && <SpaceFormModal onClose={() => setCreating(false)} onSaved={(s) => { loadSpaces(); navigate(`/s/${s.key}`); }} />}
     </div>

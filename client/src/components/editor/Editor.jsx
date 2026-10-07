@@ -244,7 +244,7 @@ export default function Editor({ content, onChange, onUpload, placeholder = 'Sch
       </BubbleMenu>
       <EditorContent editor={editor} />
       <div className="row between faint tiny mono" style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-        <span>„/“ Blöcke · Strg+S speichern · Bilder per Drag & Drop oder Einfügen</span>
+        <span>„/“ fügt Blöcke ein. Bilder per Drag & Drop oder Einfügen. Strg+S speichert.</span>
         <span>{words} Wörter</span>
       </div>
       {dragging && <div className="drop-hint">Dateien hier ablegen</div>}

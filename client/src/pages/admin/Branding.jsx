@@ -9,7 +9,7 @@ import { ACCENTS } from '../../lib/theme.js';
 const CSS_EXAMPLE = `/* Beispiel: eigene Schrift & runde Ecken */
 :root { --radius-lg: 20px; }
 .page-title { letter-spacing: -0.04em; }
-[data-theme='aurora'][data-mode='dark'] { --bg: #070910; }`;
+[data-theme='rack'][data-mode='light'] { --accent: #c1121c; }`;
 
 export default function Branding() {
   const { toast, loadSettings } = useApp();
@@ -33,7 +33,7 @@ export default function Branding() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">System</span><h1>Branding & Theming</h1><p>Standard-Look für alle Nutzer. Jede Person kann Theme, Modus und Akzent in ihren Einstellungen individuell überschreiben.</p></div>
+        <div><h1>Branding & Theming</h1><p>Standard-Look für alle Nutzer. Jede Person kann Theme, Modus und Akzent in ihren Einstellungen individuell überschreiben.</p></div>
         <button className="btn primary" onClick={save} disabled={saving}><Icon name="save" /> Speichern</button>
       </div>
       <div className="card pad">
@@ -57,7 +57,7 @@ export default function Branding() {
           <div className="col" style={{ gap: 10 }}>
             <ColorPicker value={s.accentColor} colors={ACCENTS} onChange={(c) => set('accentColor', c)} />
             <div className="row">
-              <input className="input mono" style={{ maxWidth: 160 }} value={s.accentColor} placeholder="#7c5cff" onChange={(e) => set('accentColor', e.target.value)} />
+              <input className="input mono" style={{ maxWidth: 160 }} value={s.accentColor} placeholder="#1f5f99" onChange={(e) => set('accentColor', e.target.value)} />
               {s.accentColor && <button className="btn sm" onClick={() => set('accentColor', '')}>Zurücksetzen</button>}
               {s.accentColor && <span className="btn primary sm" style={{ background: s.accentColor, pointerEvents: 'none' }}>Vorschau</span>}
             </div>

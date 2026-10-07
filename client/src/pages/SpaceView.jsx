@@ -42,40 +42,32 @@ export default function SpaceView() {
 
   return (
     <div className="content">
-      <section className="hero" style={{ '--accent': space.color, '--accent-2': space.color }}>
-        <div className="row between" style={{ position: 'relative', zIndex: 1, alignItems: 'flex-start' }}>
-          <span className="space-chip" style={{ '--sc': space.color, width: 52, height: 52, borderRadius: 14 }}><Icon name={space.icon} size={24} /></span>
-          <div className="row">
-            <span className="badge mono">{space.key}</span>
-            <span className="badge">{ACCESS_LABELS[space.access]}</span>
-            {isAdmin && (
-              <Dropdown trigger={({ toggle }) => <button className="btn icon sm" onClick={toggle} aria-label="Bereich verwalten"><Icon name="more" /></button>}>
-                <MenuItem icon="edit" onClick={() => setModal('edit')}>Bearbeiten</MenuItem>
-                <MenuItem icon="shield" onClick={() => setModal('perms')}>Berechtigungen</MenuItem>
-                <div className="menu-sep" />
-                <MenuItem icon="trash" danger onClick={() => setModal('delete')}>Bereich löschen</MenuItem>
-              </Dropdown>
-            )}
-          </div>
+      <header className="page-head" style={{ borderLeft: `6px solid ${space.color}`, paddingLeft: 16 }}>
+        <div>
+          <h1>{space.name}</h1>
+          {space.description && <p>{space.description}</p>}
+          <p className="small" style={{ marginTop: 6 }}>
+            {stats.pages} Seiten, {stats.contributors} Mitwirkende, Zugriff: {ACCESS_LABELS[space.access]}
+            {stats.overdue > 0 && <>, <strong style={{ color: 'var(--text)' }}>{stats.overdue} Reviews überfällig</strong></>}
+          </p>
         </div>
-        <h1>{space.name}</h1>
-        <p>{space.description}</p>
-        <div className="hero-actions">
-          {canWrite && <Link to={`/new?space=${space.key}`} className="btn primary"><Icon name="plus" /> Neue Seite</Link>}
-          <Link to={`/search?q=${encodeURIComponent(`space:${space.key} `)}`} className="btn"><Icon name="search" /> In Bereich suchen</Link>
+        <div className="row">
+          <Link to={`/search?q=${encodeURIComponent(`space:${space.key} `)}`} className="btn"><Icon name="search" size={15} /> Im Bereich suchen</Link>
+          {canWrite && <Link to={`/new?space=${space.key}`} className="btn primary"><Icon name="plus" size={15} /> Neue Seite</Link>}
+          {isAdmin && (
+            <Dropdown trigger={({ toggle }) => <button className="btn icon" onClick={toggle} aria-label="Bereich verwalten"><Icon name="settings" size={16} /></button>}>
+              <MenuItem icon="edit" onClick={() => setModal('edit')}>Bereich bearbeiten</MenuItem>
+              <MenuItem icon="shield" onClick={() => setModal('perms')}>Berechtigungen</MenuItem>
+              <div className="menu-sep" />
+              <MenuItem icon="trash" danger onClick={() => setModal('delete')}>Bereich löschen</MenuItem>
+            </Dropdown>
+          )}
         </div>
-      </section>
-
-      <div className="stats">
-        <div className="stat"><span className="stat-value">{stats.pages}</span><span className="stat-label">Seiten</span></div>
-        <div className="stat"><span className="stat-value">{stats.contributors}</span><span className="stat-label">Mitwirkende</span></div>
-        <div className={`stat ${stats.overdue ? 'warn' : ''}`}><span className="stat-value">{stats.overdue}</span><span className="stat-label">Reviews überfällig</span></div>
-        <div className="stat"><span className="stat-value">{types.length}</span><span className="stat-label">Seitentypen</span></div>
-      </div>
+      </header>
 
       {roots.length > 0 && (
         <>
-          <div className="section-title"><span className="eyebrow">Struktur</span></div>
+          <div className="section-title" style={{ marginTop: 8 }}><h3>Oberste Ebene</h3></div>
           <div className="children-grid" style={{ marginBottom: 28 }}>
             {roots.map((p) => (
               <Link key={p.id} to={`/p/${p.id}`} className="child-card">
@@ -112,7 +104,7 @@ export default function SpaceView() {
                 {(pagesQuery.data?.pages || []).map((p) => (
                   <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/p/${p.id}`)}>
                     <td><div className="row"><PageIcon icon={p.icon} fallback={PAGE_TYPES[p.pageType]?.icon} /><Link to={`/p/${p.id}`} style={{ color: 'var(--text)', fontWeight: 550 }}>{p.title}</Link></div></td>
-                    <td><span className="badge mono">{PAGE_TYPES[p.pageType]?.label}</span></td>
+                    <td><span className="tape">{PAGE_TYPES[p.pageType]?.label}</span></td>
                     <td><div className="row wrap" style={{ gap: 4 }}>{p.tags.slice(0, 3).map((t) => <TagPill key={t} name={t} />)}</div></td>
                     <td className="nowrap faint small">{timeAgo(p.updatedAt)}</td>
                   </tr>

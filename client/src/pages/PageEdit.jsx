@@ -21,23 +21,21 @@ function TemplatePicker({ onPick }) {
     <div className="content narrow">
       <div className="page-head">
         <div>
-          <span className="eyebrow">Neue Seite</span>
-          <h1>Womit möchtest du starten?</h1>
-          <p>Vorlagen liefern Struktur und passende Eigenschaften – ideal für einheitliche Ops-Dokumentation.</p>
+          <h1>Neue Seite</h1>
+          <p>Wähle eine Vorlage. Sie legt Gliederung, Seitentyp und Datenblatt-Felder fest.</p>
         </div>
       </div>
-      <div className="grid-3">
-        <button className="space-card" style={{ '--sc': 'var(--text-faint)', textAlign: 'left', cursor: 'pointer', font: 'inherit' }} onClick={() => onPick(null)}>
-          <span className="space-chip"><Icon name="file" size={16} /></span>
-          <h3>Leere Seite</h3>
-          <p>Ohne Vorgaben starten.</p>
+      <div className="choice-list">
+        <button className="choice" onClick={() => onPick(null)}>
+          <Icon name="file" size={18} />
+          <strong>Leere Seite</strong>
+          <span>Ohne Struktur beginnen.</span>
         </button>
-        {templates.map((t, i) => (
-          <button key={t.id} className="space-card" style={{ '--sc': `hsl(${(i * 47 + 250) % 360} 70% 58%)`, textAlign: 'left', cursor: 'pointer', font: 'inherit' }} onClick={() => onPick(t)}>
-            <span className="space-chip"><Icon name={t.icon} size={16} /></span>
-            <h3>{t.name}</h3>
-            <p>{t.description}</p>
-            <div className="space-meta"><span>{PAGE_TYPES[t.pageType]?.label || t.pageType}</span>{Object.keys(t.properties).length > 0 && <span>{Object.keys(t.properties).length} Eigenschaften</span>}</div>
+        {templates.map((t) => (
+          <button key={t.id} className="choice" onClick={() => onPick(t)}>
+            <Icon name={t.icon} size={18} />
+            <strong>{t.name}</strong>
+            <span>{t.description}</span>
           </button>
         ))}
       </div>
@@ -205,7 +203,7 @@ export default function PageEdit({ isNew = false }) {
         )}
 
         <div className="row between wrap">
-          <span className="eyebrow">{isNew ? 'Neue Seite' : `Bearbeiten · v${page.version}`}</span>
+          <span className="eyebrow">{isNew ? 'Neue Seite' : `Version ${page.version} bearbeiten`}</span>
           <button className="btn ghost sm" onClick={() => setShowMeta((s) => !s)}>
             <Icon name="settings" size={14} /> {showMeta ? 'Details ausblenden' : 'Details & Eigenschaften'}
           </button>
@@ -216,7 +214,7 @@ export default function PageEdit({ isNew = false }) {
             style={{ width: 56, height: 56, fontSize: 26, textAlign: 'center', padding: 0, flexShrink: 0 }}
             value={form.icon}
             maxLength={4}
-            placeholder="📄"
+            placeholder="–" aria-label="Seitensymbol (Emoji)"
             title="Emoji als Seitensymbol"
             onChange={(e) => set('icon', e.target.value)}
           />

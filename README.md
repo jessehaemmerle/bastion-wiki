@@ -18,7 +18,7 @@ installierbar – inklusive Offline-Lesen zuletzt besuchter Seiten.
 | **Tags** | Tag-Wolke, verwandte Tags, Autovervollständigung, Admin: umbenennen, einfärben, zusammenführen |
 | **Sysadmin-Extras** | Vorlagen für Runbooks, Incident-Postmortems, Server/Hosts, Changes, Services, Netzsegmente und Checklisten · strukturierte **Eigenschaften** („Spec Sheet“ mit Kopieren per Klick) · **Review-Termine** gegen veraltete Doku · abhakbare Checklisten direkt in der Leseansicht · Versionsverlauf mit Diff & Wiederherstellung · Anhänge · Export als Markdown/HTML · REST-API mit persönlichen **API-Tokens** · Audit-Log |
 | **Admin-Panel** | Separates „Control Center“ unter `/admin`: Systemübersicht, Benutzer, Gruppen, Bereiche & Rechte, Vorlagen, Tags, Branding & Theming, Audit-Log, Wartung & JSON-Export |
-| **Design & Theming** | 6 Themes (Aurora, Phosphor, Nord, Solarized, Ember, Graphite) jeweils hell/dunkel/System, frei wählbare Akzentfarbe, Schriftwahl, Admin-Standard-Theme, eigenes CSS über Design-Tokens |
+| **Design & Theming** | Eigenständige Gestaltung aus dem Serverraum: RAL-Farben (Lichtgrau, Anthrazit, Signalblau, Signalgelb), Seitentypen als Beschriftungsband, Atkinson Hyperlegible und Overpass Mono. 6 Themes (Rack, Leitstand, Blueprint, VT220, Nord, Solarized), jeweils hell, dunkel oder nach System; Akzentfarbe, Schriftwahl, Admin-Standard-Theme und eigenes CSS über Design-Tokens. Kontraste nach WCAG AA geprüft |
 | **PWA** | Installierbar, Service Worker mit App-Shell-Cache und Offline-Lesemodus |
 
 ## Schnellstart (Docker Compose)

@@ -26,7 +26,7 @@ export default function System() {
   return (
     <>
       <div className="page-head">
-        <div><span className="eyebrow">System</span><h1>Wartung & Export</h1><p>Aufräumarbeiten, Datenexport und Hinweise zur Sicherung.</p></div>
+        <div><h1>Wartung & Export</h1><p>Aufräumarbeiten, Datenexport und Hinweise zur Sicherung.</p></div>
       </div>
       <div className="grid-2">
         <div className="card">

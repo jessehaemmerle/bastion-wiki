@@ -123,7 +123,7 @@ export function PermissionsModal({ space, onClose }) {
 
   return (
     <Modal
-      title={`Berechtigungen · ${space.name}`}
+      title={`Berechtigungen für ${space.name}`}
       icon="shield"
       size="lg"
       onClose={onClose}
