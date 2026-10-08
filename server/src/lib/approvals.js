@@ -87,7 +87,7 @@ export const mapRequest = (r) => ({
   reviewer: r.reviewer_name, reviewNote: r.review_note, createdAt: r.created_at, updatedAt: r.updated_at, decidedAt: r.decided_at,
 });
 
-export async function decide(request, page, reviewer, approve, note = '') {
+export async function decide(request, page, reviewer, approve, note = '', seen = null) {
   if (request.status !== 'pending') throw conflict('Der Änderungsvorschlag ist bereits erledigt');
   if (!(await canReview(reviewer, page, request))) throw forbidden('Du darfst diesen Änderungsvorschlag nicht freigeben (Vier-Augen-Prinzip)');
   let updated = null;
@@ -95,6 +95,9 @@ export async function decide(request, page, reviewer, approve, note = '') {
     // re-check under a lock: a parallel decision (or withdrawal) must not apply the request twice
     const { rows: [locked] } = await c.query('SELECT * FROM change_requests WHERE id=$1 FOR UPDATE', [request.id]);
     if (!locked || locked.status !== 'pending') throw conflict('Der Änderungsvorschlag ist bereits erledigt');
+    if (approve && (Number.isNaN(Date.parse(seen)) || new Date(locked.updated_at).getTime() !== Date.parse(seen))) {
+      throw conflict('Der Änderungsvorschlag wurde inzwischen geändert – bitte erneut prüfen');
+    }
     request = { ...request, ...locked };
     if (approve) {
       const { rows: [current] } = await c.query('SELECT * FROM pages WHERE id=$1 FOR UPDATE', [page.id]);

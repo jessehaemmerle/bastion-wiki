@@ -154,7 +154,7 @@ function Git({ sec }) {
     <section className="settings-section">
       <div>
         <h3>{tr('Git-Export')}</h3>
-        <p>{tr('Spiegelt alle Seiten als Markdown-Ordnerstruktur in ein Git-Repository – lesbar auch, wenn das Wiki ausgefallen ist. Das Wiki ist die Quelle: Änderungen im Repository werden beim nächsten Abgleich überschrieben.')}</p>
+        <p>{tr('Spiegelt alle Seiten als Markdown-Ordnerstruktur in ein Git-Repository – lesbar auch, wenn das Wiki ausgefallen ist. Das Wiki ist die Quelle: Änderungen im Repository werden beim nächsten Abgleich überschrieben. Seiten mit Seitenrechten (und ihre Unterseiten) werden nicht exportiert.')}</p>
       </div>
       <div className="col" style={{ gap: 14 }}>
         {data && !data.available && <div className="error-box">{tr('Das Programm „git“ ist auf dem Server nicht installiert.')}</div>}

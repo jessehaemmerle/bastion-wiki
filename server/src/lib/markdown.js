@@ -46,12 +46,15 @@ const safeName = (s) => String(s || 'page').replace(/[^\p{L}\p{N}._-]+/gu, '-').
  * Writes all spaces as a folder tree:  <space-key>/<page>.md, children in <page>/…
  * baseUrl turns attachment and page links into absolute links (optional).
  */
-export async function exportTree(dir, { baseUrl = '' } = {}) {
-  const [spaces, pages, tags] = await Promise.all([
+export async function exportTree(dir, { baseUrl = '', skipRestricted = false } = {}) {
+  const [spaces, pages, tags, restricted] = await Promise.all([
     many('SELECT id, key, name, description FROM spaces ORDER BY sort_order, name'),
     many(`SELECT p.*, u.display_name AS updated_by_name FROM pages p LEFT JOIN users u ON u.id=p.updated_by ORDER BY p.sort_order, p.title`),
     many('SELECT pt.page_id, t.name FROM page_tags pt JOIN tags t ON t.id=pt.tag_id ORDER BY t.name'),
+    skipRestricted ? many('SELECT DISTINCT page_id FROM page_permissions') : [],
   ]);
+  // restricted pages (and with them their subpages) stay out of exports that leave the server
+  const hidden = new Set(restricted.map((r) => r.page_id));
   const tagsOf = new Map();
   for (const t of tags) (tagsOf.get(t.page_id) || tagsOf.set(t.page_id, []).get(t.page_id)).push(t.name);
   const children = new Map();
@@ -68,6 +71,7 @@ export async function exportTree(dir, { baseUrl = '' } = {}) {
     const walk = async (parentId, folder) => {
       const used = new Set();
       for (const p of children.get(`${s.id}:${parentId}`) || []) {
+        if (hidden.has(p.id)) continue;
         let name = safeName(p.slug);
         while (used.has(name)) name += '-';
         used.add(name);

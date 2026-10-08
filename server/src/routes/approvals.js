@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { many, one, query } from '../db/index.js';
 import { requireAuth } from '../lib/auth.js';
-import { forbidden, intParam, notFound, pick } from '../lib/http.js';
+import { badRequest, forbidden, intParam, notFound, pick } from '../lib/http.js';
 import { LEVEL, loadPage } from '../lib/permissions.js';
 import { audit } from '../lib/audit.js';
 import { canReview, decide, loadRequest, mapRequest, withdraw } from '../lib/approvals.js';
@@ -40,10 +40,12 @@ router.get('/pages/:id/change-request', requireAuth, async (req, res) => {
 router.post('/change-requests/:id/:action', requireAuth, async (req, res) => {
   const request = await loadRequest(intParam(req.params.id));
   const page = await loadPage(req.user, request.page_id);
-  const { note } = pick(req.body, { note: { type: 'string', max: 1000 } });
+  const { note, seen } = pick(req.body, { note: { type: 'string', max: 1000 }, seen: { type: 'string', max: 40 } });
   const action = req.params.action;
   if (action === 'approve' || action === 'reject') {
-    const updated = await decide(request, page, req.user, action === 'approve', note || '');
+    // approving needs the state the reviewer looked at, so later edits by the author are never approved unseen
+    if (action === 'approve' && !seen) throw badRequest('Feld "seen" ist erforderlich');
+    const updated = await decide(request, page, req.user, action === 'approve', note || '', seen);
     await audit(req, `page.change_${action === 'approve' ? 'approved' : 'rejected'}`, 'page', page.id, { request: request.id });
     return res.json({ ok: true, version: updated?.version });
   }

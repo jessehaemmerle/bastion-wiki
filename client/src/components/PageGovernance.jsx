@@ -163,11 +163,16 @@ export function ChangeRequestModal({ page, onClose, onDone }) {
   const act = async (action) => {
     setBusy(true);
     try {
-      await api.post(`/change-requests/${data.request.id}/${action}`, { note });
+      await api.post(`/change-requests/${data.request.id}/${action}`, { note, ...(action === 'approve' ? { seen: data.request.updatedAt } : {}) });
       toast({ approve: tr('Änderung freigegeben'), reject: tr('Änderung abgelehnt'), withdraw: tr('Vorschlag zurückgezogen') }[action]);
       onDone();
       onClose();
-    } catch (e) { toast(e.message, 'error'); setBusy(false); }
+    } catch (e) {
+      toast(e.message, 'error');
+      setBusy(false);
+      // the author changed the request meanwhile: show the new state before anyone can approve it
+      if (e.status === 409) api.get(`/pages/${page.id}/change-request`).then(setData).catch(() => {});
+    }
   };
   const r = data?.request;
   const propChanges = r ? [...new Set([...Object.keys(data.current.properties || {}), ...Object.keys(r.properties || {})])]

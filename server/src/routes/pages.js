@@ -13,7 +13,7 @@ import { trashPage } from '../lib/trash.js';
 import { assertProperties, loadSchema, mapSchema } from '../lib/schemas.js';
 import { expandSnippets, snippetMap } from '../lib/snippets.js';
 import { submitChangeRequest, pendingFor } from '../lib/approvals.js';
-import { isRestricted } from '../lib/permissions.js';
+import { carryRestrictions, isRestricted } from '../lib/permissions.js';
 import { pageMarkdown, secretPlaceholdersHtml } from '../lib/markdown.js';
 
 const router = Router();
@@ -290,7 +290,10 @@ export async function writePage(c, current, fields, author, summary = '') {
   const schemaId = fields.schemaId !== undefined ? fields.schemaId : current.schema_id;
   const contentChanged = content !== current.content || title !== current.title
     || JSON.stringify(properties) !== JSON.stringify(current.properties) || schemaId !== current.schema_id;
-  if (fields.parentId !== undefined) await assertParent(c, fields.parentId, current.space_id, current.id, author.id);
+  if (fields.parentId !== undefined) {
+    await assertParent(c, fields.parentId, current.space_id, current.id, author.id);
+    if (fields.parentId !== current.parent_id) await carryRestrictions(c, current.id, fields.parentId);
+  }
   const slug = title !== current.title ? await uniqueSlug(c, current.space_id, title, current.id) : current.slug;
   const version = contentChanged ? current.version + 1 : current.version;
   const { rows } = await c.query(
@@ -390,6 +393,7 @@ router.post('/pages/:id/move', async (req, res) => {
   const parentId = b.parentId ?? null;
   await tx(async (c) => {
     await assertParent(c, parentId, targetSpaceId, page.id, req.user.id);
+    if (parentId !== page.parent_id || targetSpaceId !== page.space_id) await carryRestrictions(c, page.id, parentId);
     if (targetSpaceId !== page.space_id) {
       // move whole subtree to the new space; every slug must be unique there, not only the moved page's
       const { rows: subtree } = await c.query(
